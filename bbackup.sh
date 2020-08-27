@@ -119,7 +119,7 @@ compress() {
 	#
 	if [ -d $dest ]; then
 		# Check if the trigger is defined.
-        	if [[ $COMP_DEL == 1 ]]; then
+        	if [[ $COMP_REM == 1 ]]; then
             		log "Trying to delete [$dest]." "DEBUG"
 			{
             			rm -rf $dest 2>&1 /dev/null
