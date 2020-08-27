@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Config description
 - The project was moved out from Scripts/backupper and is now it's own repo with a new name (bbackup)
 
+### Fixed 🐞
+- Issue #1 error with compression algo.
+
 
 ## [1.0.3] - 24.08.2020
 ### Added ✨
