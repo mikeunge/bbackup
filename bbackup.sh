@@ -252,7 +252,7 @@ done
 # Compression implementation.
 if [[ $COMPRESS == 1 ]]; then
     # Define a 'local' error count.
-    local error=0
+    error=0
 
     # Check if source string is NOT empty.
 	if [ -z $COMP_SRC ]; then
@@ -306,11 +306,11 @@ if [[ $COMPRESS == 1 ]]; then
 		#
 		IFS='/' read -ra dest_arr <<< "$elem"
 
-		local arr_len=${#dest_arr[@]}
-		local dest_elem=${dest_arr[$arr_len - 1]}
+		arr_len=${#dest_arr[@]}
+		dest_elem=${dest_arr[$arr_len - 1]}
 
 		# Construct the destinatino path.
-		local dest="$COMP_TMP$dest_elem.tar.bz2"
+		dest="$COMP_TMP$dest_elem.tar.bz2"
 		# Compress each element.
 		{
 			compress $elem $dest &
