@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3.2] - 28.08.2020
+### Added ✨
+- Local variables where they should be
+- New test fucntion, give the parameter TEST_C and the script will execute in a test envirement
+
+
 ## [1.0.3.1] - 26.08.2020
 ### Added ✨
 - Multi-Threaded compression
