@@ -23,5 +23,6 @@ The script needs **bash**, **smb/cifs**, **rsnapshot** and an *e-mail* client li
 - [ ] Add skip option for network mount
 - [x] Add routine for delting /tmp files
 - [x] Use local variables instead of global once
-- [ ] Add a test functionallity
+- [x] Add a test functionallity
 - [ ] Bug fixes and tests...
+

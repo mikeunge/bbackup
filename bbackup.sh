@@ -202,6 +202,7 @@ log "Configfile => $CONFIG_FILE." "INFO"
 if [ -z "$1" ]; then
     log "No argument supplied, fallback to config defined job => $DEFAULT_JOB." "WARNING"
     JOB="$DEFAULT_JOB"
+    TEST=0
 else
     # Create a test execution flag.
     # If the passed argumetn is equal to TEST_C the flag will be set.
