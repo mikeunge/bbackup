@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # bbackup.sh
-# version: 1.0.3.1
+# version: 1.0.3.2
 #
 # Author:	Ungerböck Michele
 # Github:	github.com/mikeunge
@@ -12,6 +12,7 @@
 # Get start time and date_only.
 start_date=$(date +'%d.%m.%Y')
 script_start=$(date +'%d.%m.%Y %T')
+calc_start=$(date + '%Y-%m-%d %T')
 
 # Load the config.
 CONFIG_FILE="/etc/bbackup.conf"   # change this path if needed.
@@ -37,7 +38,7 @@ log() {
     (( ${levels[$priority]} < ${levels[$LOG_LEVEL]} )) && return 2
 
     # Get the current datetime.
-    cur_datetime=$(date +'%d.%m.%Y %T')
+    local cur_datetime=$(date +'%d.%m.%Y %T')
 
     # Check if file logging is enabled, else echo to stdout.
     if [[ $LOG_ENABLE == 1 ]]; then
@@ -51,7 +52,7 @@ log() {
 
 send_email() {
     log "Sending email via $MAIL_CLIENT..." "DEBUG"
-    mail_str=""
+    local mail_str=""
     # Check if the mail_client is defined correctly.
     case $MAIL_CLIENT in
         "sendmail"|"mail") 
@@ -69,12 +70,17 @@ send_email() {
 }
 
 panic() {
+    # Define vars.
+    local error=0
+    local status=""
+
     # Check if a argument is provided.
     if [ -z "$1" ]; then
         error=1
     else
         error=$1
     fi
+
     # Check for different error cases.
     case $error in
         1)
@@ -100,54 +106,93 @@ panic() {
     esac
 }
 
+# Calculate the elapsed time (Analytics only)
+function calc_time() {
+    num=$1
+    min=0
+    hour=0
+    day=0
+    if((num>59));then
+        ((sec=num%60))
+        ((num=num/60))
+        if((num>59));then
+            ((min=num%60))
+            ((num=num/60))
+            if((num>23));then
+                ((hour=num%24))
+                ((day=num/24))
+            else
+                ((hour=num))
+            fi
+        else
+            ((min=num))
+        fi
+    else
+        ((sec=num))
+    fi
+    log "Day(s): $day  |  Hour(s): $hour  |  Min(s): $min  |  Sec(s): $sec" "DEBUG"
+}
+
 compress() {
-	err=0
+	local error=0
 	if [ -z $1 ]; then
 		log "No source provided!" "WARNING"
-		err=1
+		error=1
 	fi
 	if [ -z $2 ]; then
 		log "No destination provided!" "WARNING"
-		err=1
+		error=1
 	fi
 	
 	# Define variables for better understanding.
-	src=$1
-	dest=$2
+	local src=$1
+	local dest=$2
 
 	# Routine for deleting the existing src.
-	#
 	if [ -d $dest ]; then
 		# Check if the trigger is defined.
-        	if [[ $COMP_REM == 1 ]]; then
-            		log "Trying to delete [$dest]." "DEBUG"
-			{
-            			rm -rf $dest 2>&1 /dev/null
-			} || {
-				log "An error occured while deleting [$dest]" "WARNING"
-				err=1
-			}
-            	if [[ $? == 0 ]]; then
-                	log "File $dest deleted successfully." "DEBUG"
-            	else
-                	log "Could not delete $dest." "WARNING"
-			err=1
-            	fi
+        if [[ $COMP_REM == 1 ]]; then
+            local return_code=25
+           	log "Trying to delete [$dest]." "DEBUG"
+            {
+                if [[ $TEST == 0 ]]; then
+                    rm -rf $dest 2>&1 /dev/null
+                    return_code=$?
+                else
+                    log "Test - Destination [$dest] would be deleted." "DEBUG"
+                    return_code=0
+                fi
+            } || {
+                log "An error occured while deleting [$dest]" "WARNING"
+                error=1
+            }
+           if [[ $return_code == 0 ]]; then
+              	log "File $dest deleted successfully." "DEBUG"
+           else
+              	log "Could not delete $dest." "WARNING"
+		        error=1
+           fi
         fi
-    	else 
-        	log "Destination doesn't exist. [$dest]" "DEBUG"
-    	fi
+    else 
+      	log "Destination doesn't exist. [$dest]" "DEBUG"
+    fi
 
 	# Check for errors.
-	if [[ $err == 1 ]]; then
+	if [[ $error == 1 ]]; then
 		log "One ore more errors occured, please check the log for more information." "ERROR"
 	else
+        local return_code=25
 		log "Compressing [$src -> $dest]" "INFO"
 		# Suppress warning "file-changed".
- 	        # This flag needs to be set, it ignores if file changes occured.
-        	# If it detects a change, it will simply ignore it, else it would need manual accaptance (eg. ENTER).
-		tar --warning=no-file-changed -cPjf $dest $src 2>&1 /dev/null
-        	return_code=$?
+ 	    # This flag needs to be set, it ignores if file changes occured.
+        # If it detects a change, it will simply ignore it, else it would need manual accaptance (eg. ENTER).
+        if [[ $TEST == 0 ]]; then
+		    tar --warning=no-file-changed -cPjf $dest $src 2>&1 /dev/null
+            return_code=$?
+        else
+            log "Test - File(s) would be compressed now." "DEBUG"
+            return_code=0
+        fi
 		# Check the 'tar' return code.
 		if [[ $return_code == 0 ]]; then
 			log "Compression [$src -> $dest] succeeded." "INFO"
@@ -161,16 +206,20 @@ compress() {
 # If so, remove the defined logs for cleaner output.
 if [[ $LOG_ROTATE == 1 ]]; then
     log "LOG_ROTATE is active." "DEBUG"
-    # Check if the logfiles exist, if so, delete them.
-    log_files=( "$LOG_FILE" "$RSNAPSHOT_LOG_FILE" )
-    for file in "${log_files[@]}"; do
-        if [ -f "$file" ]; then
-            rm -f "$file"
-            log "Deleted logfile $file" "DEBUG"
-        else
-            log "$file doesn't exist. Next." "DEBUG"
-        fi
-    done
+    if ! [[ $1 == "TEST_C" ]]; then
+        # Check if the logfiles exist, if so, delete them.
+        log_files=( "$LOG_FILE" "$RSNAPSHOT_LOG_FILE" )
+        for file in "${log_files[@]}"; do
+            if [ -f "$file" ]; then
+                rm -f "$file"
+                log "Deleted logfile $file" "DEBUG"
+            else
+                log "$file doesn't exist. Next." "DEBUG"
+            fi
+        done
+    else
+        log "Test - Skipped log_rotation for test purpose, files would be deletetd." "DEBUG"
+    fi
 fi
 
 # Start of the script.
@@ -181,17 +230,28 @@ log "Configfile => $CONFIG_FILE." "INFO"
 if [ -z "$1" ]; then
     log "No argument supplied, fallback to config defined job => $DEFAULT_JOB." "WARNING"
     JOB="$DEFAULT_JOB"
+    TEST=0
 else
-    JOB="$1"
-    log "Executed job => $JOB." "DEBUG"
+    # Create a test execution flag.
+    # If the passed argumetn is equal to TEST_C the flag will be set.
+    if [[ $1 == "TEST_C" ]]; then
+        # Define a TEST variable and change the log_level as well as the log output to stdout.
+        TEST=1
+        LOG_ENABLE=0
+        LOG_LEVEL="DEBUG"
+        log "Initializing test case." "DEBUG"
+    else
+        JOB=$1
+        TEST=0
+        log "Executed job => $JOB." "DEBUG"
+    fi
 fi
 
 # Check if the second job is executed.
-if [[ "$SEC_JOB" == "$JOB" ]]; then
+if [[ $SEC_JOB == $JOB ]]; then
     log "Second job got triggered, share has changed. [$SHARE => $SEC_SHARE]" "INFO"
     SHARE="$SEC_SHARE"
 fi
-
 
 # TODO: Add skip function for network mounting.
 #
@@ -232,7 +292,11 @@ if [[ $COMPRESS == 1 ]]; then
 	if ! [ -d $COMP_TMP ]; then
 		log "TMP folder does not exist, creating '$COMP_TMP'" "INFO"
 		{
-			mkdir $COMP_TMP
+            if [[ $TEST == 0 ]]; then
+			    mkdir $COMP_TMP
+            else
+                log "Test - Folder creation skipped." "DEBUG"
+            fi
 		} || {
 			log "Couldn't create folder '$COMP_TMP'" "ERROR"
 			error=1
@@ -249,10 +313,11 @@ if [[ $COMPRESS == 1 ]]; then
 	IFS=$COMP_DEL read -ra COMP_SRC_SPLIT <<< "$COMP_SRC"
 
     # Make sure the source string is splitable.
+    # If not, it'll probably only be one path provided.
     if [[ ${#COMP_SRC_SPLIT[@]} == 1 ]]; then
-        log "Compression source string is NOT splitable by delimiter '$COMP_DEL'! Make sure to define the correct delimiter and/or define/split the correct source." "ERROR"
-        panic 1
+        log "Compression source string is NOT splitable by delimiter '$COMP_DEL'! Probably only one (1) path provided, if not, check the configuration." "WARNING"
     fi
+
 	# Loop over the split array.
 	for elem in "${COMP_SRC_SPLIT[@]}"
 	do
@@ -294,7 +359,14 @@ fi
 log "Starting rSnapshot job ... [$JOB]" "INFO"
 {
     # Run the rsnapshot backup job.
-    cmd="$RSNAPSHOT $JOB"
+    if [[ $TEST == 0 ]]; then
+        cmd="$RSNAPSHOT $JOB"
+    else
+        cmd="$RSNAPSHOT -t $JOB"
+        log "Test - Executing rsnapshot with it's test parameter." "DEBUG"
+        log "Test - rsnapshot job: $cmd"
+    fi
+
     output=`$cmd`
     # Check if the rsnapshot output is empty or not.
     if [[ $output != "" ]]; then
@@ -313,5 +385,8 @@ log "Starting rSnapshot job ... [$JOB]" "INFO"
 }
 
 script_end=$(date +'%d.%m.%Y %T')
+calc_end=$(date + '%Y-%m-%d %T')
 log "Start: $script_start :: End: $script_end" "DEBUG"
+# Calculate the difference between script start and script finished.
+calc_time "$(($(date -d "$calc_end" '+%s') - $(date -d "$calc_start" '+%s')))" 
 panic 0
