@@ -149,7 +149,7 @@ compress() {
 	local dest=$2
 
 	# Routine for deleting the existing src.
-	if [ -d $dest ]; then
+	if [[ -f $dest ]]; then
 		# Check if the trigger is defined.
         if [[ $COMP_REM == 1 ]]; then
             local return_code=25
