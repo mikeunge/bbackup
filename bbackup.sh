@@ -12,6 +12,7 @@
 # Get start time and date_only.
 start_date=$(date +'%d.%m.%Y')
 script_start=$(date +'%d.%m.%Y %T')
+calc_start=$(date + '%Y-%m-%d %T')
 
 # Load the config.
 CONFIG_FILE="/etc/bbackup.conf"   # change this path if needed.
@@ -103,6 +104,33 @@ panic() {
             send_email
             exit 1 ;;
     esac
+}
+
+# Calculate the elapsed time (Analytics only)
+function calc_time() {
+    num=$1
+    min=0
+    hour=0
+    day=0
+    if((num>59));then
+        ((sec=num%60))
+        ((num=num/60))
+        if((num>59));then
+            ((min=num%60))
+            ((num=num/60))
+            if((num>23));then
+                ((hour=num%24))
+                ((day=num/24))
+            else
+                ((hour=num))
+            fi
+        else
+            ((min=num))
+        fi
+    else
+        ((sec=num))
+    fi
+    log "Day(s): $day  |  Hour(s): $hour  |  Min(s): $min  |  Sec(s): $sec" "DEBUG"
 }
 
 compress() {
@@ -284,12 +312,10 @@ if [[ $COMPRESS == 1 ]]; then
 	# Creates the $COMP_SRC_SPLIT array.
 	IFS=$COMP_DEL read -ra COMP_SRC_SPLIT <<< "$COMP_SRC"
 
-    # TODO: Make this an exception if ONLY one path is given, don't panic.
-    #
     # Make sure the source string is splitable.
+    # If not, it'll probably only be one path provided.
     if [[ ${#COMP_SRC_SPLIT[@]} == 1 ]]; then
-        log "Compression source string is NOT splitable by delimiter '$COMP_DEL'! Make sure to define the correct delimiter and/or define/split the correct source." "ERROR"
-        panic 1
+        log "Compression source string is NOT splitable by delimiter '$COMP_DEL'! Probably only one (1) path provided, if not, check the configuration." "WARNING"
     fi
 
 	# Loop over the split array.
@@ -359,5 +385,8 @@ log "Starting rSnapshot job ... [$JOB]" "INFO"
 }
 
 script_end=$(date +'%d.%m.%Y %T')
+calc_end=$(date + '%Y-%m-%d %T')
 log "Start: $script_start :: End: $script_end" "DEBUG"
+# Calculate the difference between script start and script finished.
+calc_time "$(($(date -d "$calc_end" '+%s') - $(date -d "$calc_start" '+%s')))" 
 panic 0
