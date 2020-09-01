@@ -73,7 +73,7 @@ send_email() {
     local return_code=$?
     log "send_mail() returned with $return_code." "DEBUG"
     # Exit the script after sending the email
-    if [[ $return_code > 0]]; then
+    if [[ $return_code > 0 ]]; then
         panic 2
     else
         exit 0
@@ -380,7 +380,7 @@ if [[ $COMPRESS == 1 ]]; then
             *) dest="$COMP_TMP$dest_elem.tar.bz2" ;;
         esac
         # Add the destination to the CLEANUP array so they will get later deleted.
-        $CLEANUP_DEST_ARR+=($dest)
+        CLEANUP_DEST_ARR+=($dest)
 		# Compress each element.
 		{
 			compress $elem $dest &
