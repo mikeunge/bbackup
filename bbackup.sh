@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # bbackup.sh
-# version: 1.0.3.2
+# version: 1.0.3.3
 #
 # Author:	Ungerböck Michele
 # Github:	github.com/mikeunge
@@ -51,14 +51,18 @@ log() {
 }
 
 send_email() {
+    # Check if attachment exists.
+    if ! [ -d $RSNAPSHOT_LOG_FILE ]; then
+        log "rsnapshot logfile does not exist, attachment cannot be attached." "WARNING"
+    fi
     log "Sending email via $MAIL_CLIENT..." "DEBUG"
     local mail_str=""
     # Check if the mail_client is defined correctly.
     case $MAIL_CLIENT in
         "sendmail"|"mail") 
-            mail_str='mail -A $RSNAPSHOT_LOG_FILE -s "$SENDER [$status] (exec=$JOB) - $start_date" $DEST_EMAIL < $LOG_FILE' ;;
+            mail_str='mail -A $RSNAPSHOT_LOG_FILE -s "$SENDER [$status] - Task: $JOB - $start_date" $DEST_EMAIL < $LOG_FILE' ;;
         "mutt") 
-            mail_str='mutt -s "$SENDER [$status] (exec=$JOB) - $start_date" -a $RSNAPSHOT_LOG_FILE -- $DEST_EMAIL < $LOG_FILE' ;;
+            mail_str='mutt -s "$SENDER [$status] - Task: $JOB - $start_date" -a $RSNAPSHOT_LOG_FILE -- $DEST_EMAIL < $LOG_FILE' ;;
         *)
             log "Could not send the e-mail; Mail client ($MAIL_CLIENT) is not (or wrong) defined. Please check the config. ($CONFIG_FILE)" "ERROR"
             panic 2     # Special case that kills the script entirely without trying to send the e-mail (again).
@@ -66,7 +70,14 @@ send_email() {
     esac
     # Send the email;
     eval $mail_str
-    log "send_mail() returned with $?." "DEBUG"
+    local return_code=$?
+    log "send_mail() returned with $return_code." "DEBUG"
+    # Exit the script after sending the email
+    if [[ $return_code > 0]]; then
+        panic 2
+    else
+        exit 0
+    fi
 }
 
 panic() {
@@ -87,6 +98,7 @@ panic() {
             status="error"
             log "An error occured, please check the mail content and/or the attachment for more informations." "ERROR"
             send_email
+            wait
             exit 1;;
         2)  # This is a special case (panic 2) that only gets triggered from the send_email function.
             # The check prevents the script from an endless loop. (=> dosn't call the send_email function like the other cases)
@@ -97,21 +109,61 @@ panic() {
             status="success"
             log "Backup was successfully created!" "INFO"
             send_email
+            wait
             exit 0 ;;
         *)  # This should actually never happen.
             status="warning"
             log "A warning was raised, please check the mail content and/or the attachment for more informations." "WARNING"
             send_email
+            wait
             exit 1 ;;
     esac
 }
 
+CLEANUP_DEST_ARR=()
+# Clean all the created garbage.
+cleanup() {
+    for $dest in "${CLEANUP_DEST_ARR[@]}"
+    do
+        # Routine for deleting the existing src.
+        if [[ -f $dest ]]; then
+            # Check if the trigger is defined.
+            # TODO: add this call AFTER the rsnapshot part is done.
+            if [[ $COMP_REM == 1 ]]; then
+                local return_code=25
+                log "Trying to delete [$dest]." "DEBUG"
+                {
+                    if [[ $TEST == 0 ]]; then
+                        rm -rf $dest 2>&1 /dev/null
+                        return_code=$?
+                    else
+                        log "Test - Destination [$dest] would be deleted." "DEBUG"
+                        return_code=0
+                    fi
+                } || {
+                    log "An error occured while deleting [$dest]" "WARNING"
+                    continue
+                }
+            if [[ $return_code == 0 ]]; then
+                    log "File $dest deleted successfully." "DEBUG"
+            else
+                    log "Could not delete $dest." "WARNING"
+                    continue
+            fi
+            fi
+        else 
+            log "Destination doesn't exist. [$dest]" "DEBUG"
+            continue
+        fi
+    done
+}
+
 # Calculate the elapsed time (Analytics only)
 function calc_time() {
-    num=$1
-    min=0
-    hour=0
-    day=0
+    local num=$1
+    local min=0
+    local hour=0
+    local day=0
     if((num>59));then
         ((sec=num%60))
         ((num=num/60))
@@ -148,35 +200,6 @@ compress() {
 	local src=$1
 	local dest=$2
 
-	# Routine for deleting the existing src.
-	if [[ -f $dest ]]; then
-		# Check if the trigger is defined.
-        if [[ $COMP_REM == 1 ]]; then
-            local return_code=25
-           	log "Trying to delete [$dest]." "DEBUG"
-            {
-                if [[ $TEST == 0 ]]; then
-                    rm -rf $dest 2>&1 /dev/null
-                    return_code=$?
-                else
-                    log "Test - Destination [$dest] would be deleted." "DEBUG"
-                    return_code=0
-                fi
-            } || {
-                log "An error occured while deleting [$dest]" "WARNING"
-                error=1
-            }
-           if [[ $return_code == 0 ]]; then
-              	log "File $dest deleted successfully." "DEBUG"
-           else
-              	log "Could not delete $dest." "WARNING"
-		        error=1
-           fi
-        fi
-    else 
-      	log "Destination doesn't exist. [$dest]" "DEBUG"
-    fi
-
 	# Check for errors.
 	if [[ $error == 1 ]]; then
 		log "One ore more errors occured, please check the log for more information." "ERROR"
@@ -187,7 +210,13 @@ compress() {
  	    # This flag needs to be set, it ignores if file changes occured.
         # If it detects a change, it will simply ignore it, else it would need manual accaptance (eg. ENTER).
         if [[ $TEST == 0 ]]; then
-		    tar --warning=no-file-changed -cPjf $dest $src 2>&1 /dev/null
+            # This COMP_MOD trigger can be set in the configuration file.
+            # The tar (only) mode creates an uncompressed tar file where as the default is bz2.
+            case $COMP_MOD in
+                "tar") tar --warning=no-file-changed -cPf $dest $src 2>&1 /dev/null ;;
+                "bz2" | "bzip2") tar --warning=no-file-changed -cPjf $dest $src 2>&1 /dev/null ;;
+                *) tar --warning=no-file-changed -cPjf $dest $src 2>&1 /dev/null ;;
+            esac
             return_code=$?
         else
             log "Test - File(s) would be compressed now." "DEBUG"
@@ -202,23 +231,27 @@ compress() {
 	fi
 }
 
-# Check if the log_rotate is set.
-# If so, remove the defined logs for cleaner output.
+log_rotate() {
+    # Check if the logfiles exist, if so, delete them.
+    log_files=( "$LOG_FILE" "$RSNAPSHOT_LOG_FILE" )
+    for file in "${log_files[@]}"; do
+        if [ -f "$file" ]; then
+            rm -f "$file"
+            log "Deleted logfile $file" "DEBUG"
+        else
+            log "$file doesn't exist. Next." "DEBUG"
+        fi
+    done
+}
+
+# Check if LOG_ROTATE is enabled.
+# If so, remove the logs for a cleaner output.
 if [[ $LOG_ROTATE == 1 ]]; then
     log "LOG_ROTATE is active." "DEBUG"
-    if ! [[ $1 == "TEST_C" ]]; then
-        # Check if the logfiles exist, if so, delete them.
-        log_files=( "$LOG_FILE" "$RSNAPSHOT_LOG_FILE" )
-        for file in "${log_files[@]}"; do
-            if [ -f "$file" ]; then
-                rm -f "$file"
-                log "Deleted logfile $file" "DEBUG"
-            else
-                log "$file doesn't exist. Next." "DEBUG"
-            fi
-        done
+    if [[ $1 == "TEST_C" ]]; then
+        log "Test - Skipped log_rotation for test prupose, files would be deleted." "DEBUG"
     else
-        log "Test - Skipped log_rotation for test purpose, files would be deletetd." "DEBUG"
+        log_rotate
     fi
 fi
 
@@ -336,8 +369,14 @@ if [[ $COMPRESS == 1 ]]; then
 		arr_len=${#dest_arr[@]}
 		dest_elem=${dest_arr[$arr_len - 1]}
 
-		# Construct the destinatino path.
-		dest="$COMP_TMP$dest_elem.tar.bz2"
+		# Construct the destinatin path.
+        case "$COMP_MOD" in
+            "tar") dest="$COMP_TMP$dest_elem.tar" ;;
+            "bz2" | "bzip2") dest="$COMP_TMP$dest_elem.tar.bz2" ;;
+            *) dest="$COMP_TMP$dest_elem.tar.bz2" ;;
+        esac
+        # Add the destination to the CLEANUP array so they will get later deleted.
+        $CLEANUP_DEST_ARR+=($dest)
 		# Compress each element.
 		{
 			compress $elem $dest &
@@ -384,6 +423,9 @@ log "Starting rSnapshot job ... [$JOB]" "INFO"
     fi
 }
 
+# Start the cleanup routine.
+cleanup
+# Mark the end of the script.
 script_end=$(date +'%d.%m.%Y %T')
 calc_end=$(date + '%Y-%m-%d %T')
 log "Start: $script_start :: End: $script_end" "DEBUG"

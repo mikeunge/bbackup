@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3.3] - 01.09.2020
+### Added ✨
+- Cleanup routine at the **end** of the script
+- More wait statements for the `send_email` function
+- Choose between compression/tar modes
+
+### Changed ⚠️
+- Outsourced `log_rotate` as well as the `cleanup`
+
+
 ## [1.0.3.2] - 31.08.2020
 ### Added ✨
 - Local variables where they should be
