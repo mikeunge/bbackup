@@ -210,7 +210,13 @@ compress() {
  	    # This flag needs to be set, it ignores if file changes occured.
         # If it detects a change, it will simply ignore it, else it would need manual accaptance (eg. ENTER).
         if [[ $TEST == 0 ]]; then
-		    tar --warning=no-file-changed -cPjf $dest $src 2>&1 /dev/null
+            # This COMP_MOD trigger can be set in the configuration file.
+            # The tar (only) mode creates an uncompressed tar file where as the default is bz2.
+            case $COMP_MOD in
+                "tar") tar --warning=no-file-changed -cPf $dest $src 2>&1 /dev/null ;;
+                "bz2" | "bzip2") tar --warning=no-file-changed -cPjf $dest $src 2>&1 /dev/null ;;
+                *) tar --warning=no-file-changed -cPjf $dest $src 2>&1 /dev/null ;;
+            esac
             return_code=$?
         else
             log "Test - File(s) would be compressed now." "DEBUG"
@@ -364,7 +370,11 @@ if [[ $COMPRESS == 1 ]]; then
 		dest_elem=${dest_arr[$arr_len - 1]}
 
 		# Construct the destinatin path.
-		dest="$COMP_TMP$dest_elem.tar.bz2"
+        case "$COMP_MOD" in
+            "tar") dest="$COMP_TMP$dest_elem.tar" ;;
+            "bz2" | "bzip2") dest="$COMP_TMP$dest_elem.tar.bz2" ;;
+            *) dest="$COMP_TMP$dest_elem.tar.bz2" ;;
+        esac
         # Add the destination to the CLEANUP array so they will get later deleted.
         $CLEANUP_DEST_ARR+=($dest)
 		# Compress each element.
