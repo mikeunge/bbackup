@@ -214,8 +214,10 @@ compress() {
             # The tar (only) mode creates an uncompressed tar file where as the default is bz2.
             case $COMP_MOD in
                 "tar") tar --warning=no-file-changed -cPf $dest $src 2>&1 /dev/null ;;
-                "bz2" | "bzip2") tar --warning=no-file-changed -cPjf $dest $src 2>&1 /dev/null ;;
-                *) tar --warning=no-file-changed -cPjf $dest $src 2>&1 /dev/null ;;
+                "bz2" | "bzip2") tar --warning=no-file-changed -cP --bzip2 -f $dest $src 2>&1 /dev/null ;;
+                "gz" | "gzip") tar --warning=no-file-changed -cP --gzip -f $dest $src 2>&1 /dev/null ;;
+                "lzma") tar --warning=no-file-changed -cP --lzma -f $dest $src 2>&1 /dev/null ;;
+                *) tar --warning=no-file-changed -cP --bzip2 -f $dest $src 2>&1 /dev/null ;;
             esac
             return_code=$?
         else
@@ -293,7 +295,7 @@ i=0
 while [[ $i < $TRIES ]]; do
     if ! grep -q "$MOUNT" /proc/mounts; then
         { # Try to mount the network drive.
-            log "Mounting share ... [$SHARE]" "INFO"
+            log "Mounting share ... [$SHARE]" "DEBUG"
             mount -t cifs -o username="$USER",password="$PASSWORD" "$SHARE" "$MOUNT" > /dev/null 2>&1
             log "Network share successfully mounted!" "INFO"
             break
@@ -373,6 +375,8 @@ if [[ $COMPRESS == 1 ]]; then
         case "$COMP_MOD" in
             "tar") dest="$COMP_TMP$dest_elem.tar" ;;
             "bz2" | "bzip2") dest="$COMP_TMP$dest_elem.tar.bz2" ;;
+            "gz" | "gzip") dest="$COMP_TMP$dest_elem.tar.gz" ;;
+            "lzma") dest="$COMP_TMP$dest_elem.tar.lzma" ;;
             *) dest="$COMP_TMP$dest_elem.tar.bz2" ;;
         esac
         # Add the destination to the CLEANUP array so they will get later deleted.
