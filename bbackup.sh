@@ -12,7 +12,7 @@
 # Get start time and date_only.
 start_date=$(date +'%d.%m.%Y')
 script_start=$(date +'%d.%m.%Y %T')
-calc_start=$(date + '%Y-%m-%d %T')
+calc_start=$(date +'%Y-%m-%d %T')
 
 # Load the config.
 CONFIG_FILE="/etc/bbackup.conf"   # change this path if needed.
@@ -52,15 +52,17 @@ log() {
 
 send_email() {
     # Check if attachment exists.
-    if ! [ -d $RSNAPSHOT_LOG_FILE ]; then
+    if ! [ -f $RSNAPSHOT_LOG_FILE ]; then
         log "rsnapshot logfile does not exist, attachment cannot be attached." "WARNING"
     fi
     log "Sending email via $MAIL_CLIENT..." "DEBUG"
     local mail_str=""
     # Check if the mail_client is defined correctly.
     case $MAIL_CLIENT in
-        "sendmail"|"mail") 
-            mail_str='mail -A $RSNAPSHOT_LOG_FILE -s "$SENDER [$status] - Task: $JOB - $start_date" $DEST_EMAIL < $LOG_FILE' ;;
+        "sendmail")
+            mail_str='sendmail -t $DEST_EMAIL -m "$SENDER [$status] - Task: $JOB - $start_date" -a $RSNAPSHOT_LOG_FILE' ;;
+        "mail")
+            mail_str='mail -a $RSNAPSHOT_LOG_FILE -s "$SENDER [$status] - Task: $JOB - $start_date" $DEST_EMAIL < $LOG_FILE' ;;
         "mutt") 
             mail_str='mutt -s "$SENDER [$status] - Task: $JOB - $start_date" -a $RSNAPSHOT_LOG_FILE -- $DEST_EMAIL < $LOG_FILE' ;;
         *)
@@ -123,12 +125,11 @@ panic() {
 CLEANUP_DEST_ARR=()
 # Clean all the created garbage.
 cleanup() {
-    for $dest in "${CLEANUP_DEST_ARR[@]}"
+    for dest in "${CLEANUP_DEST_ARR[@]}"
     do
         # Routine for deleting the existing src.
         if [[ -f $dest ]]; then
             # Check if the trigger is defined.
-            # TODO: add this call AFTER the rsnapshot part is done.
             if [[ $COMP_REM == 1 ]]; then
                 local return_code=25
                 log "Trying to delete [$dest]." "DEBUG"
@@ -145,7 +146,7 @@ cleanup() {
                     continue
                 }
             if [[ $return_code == 0 ]]; then
-                    log "File $dest deleted successfully." "DEBUG"
+                    log "File $dest deleted successfully." "INFO"
             else
                     log "Could not delete $dest." "WARNING"
                     continue
@@ -407,7 +408,7 @@ log "Starting rSnapshot job ... [$JOB]" "INFO"
     else
         cmd="$RSNAPSHOT -t $JOB"
         log "Test - Executing rsnapshot with it's test parameter." "DEBUG"
-        log "Test - rsnapshot job: $cmd"
+        log "Test - rsnapshot job: $cmd" "DEBUG"
     fi
 
     output=`$cmd`
@@ -431,7 +432,7 @@ log "Starting rSnapshot job ... [$JOB]" "INFO"
 cleanup
 # Mark the end of the script.
 script_end=$(date +'%d.%m.%Y %T')
-calc_end=$(date + '%Y-%m-%d %T')
+calc_end=$(date +'%Y-%m-%d %T')
 log "Start: $script_start :: End: $script_end" "DEBUG"
 # Calculate the difference between script start and script finished.
 calc_time "$(($(date -d "$calc_end" '+%s') - $(date -d "$calc_start" '+%s')))" 
