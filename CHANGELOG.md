@@ -4,14 +4,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3.4] - 02.09.2020
+### Added ✨
+- `bbackup` now locks itself (*/var/run/bbackup.pid*)
+
+
 ## [1.0.3.3] - 01.09.2020
 ### Added ✨
 - Cleanup routine at the **end** of the script
 - More wait statements for the `send_email` function
-- Choose between compression/tar modes
+- Choose between compression/tar modes (tar, bz2, gz, lmza)
 
 ### Changed ⚠️
-- Outsourced `log_rotate` as well as the `cleanup`
+- Outsourced `log_rotate` as well as the *tmp* `cleanup`
+- Toggle *mail* and *sendmail* different
+
+### Fixed 🐞
+- `if ! [ -f $RSNAPSHOT_LOG_FILE ]; then` didn't find the file because it looked for a directory: `[ -d $RSNAPSHOT_LOG_FILE ]`
+- `date +'%Y-%m-%d %T'` returned an error because of whitespace
+- `send_email()` with case `mail|sendmail` couldn't attach `$RSNAPSHOT_LOG_FILE`
 
 
 ## [1.0.3.2] - 31.08.2020

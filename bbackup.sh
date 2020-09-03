@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # bbackup.sh
-# version: 1.0.3.3
+# version: 1.0.3.4
 #
 # Author:	Ungerböck Michele
 # Github:	github.com/mikeunge
@@ -9,6 +9,9 @@
 #
 # All rights reserved.
 #
+# Store the pid for bbackup.sh as $_pid.
+# $_pid will get written into /var/run/bbackup.pid
+_pid=$$ 
 # Get start time and date_only.
 start_date=$(date +'%d.%m.%Y')
 script_start=$(date +'%d.%m.%Y %T')
@@ -69,7 +72,7 @@ send_email() {
             log "Could not send the e-mail; Mail client ($MAIL_CLIENT) is not (or wrong) defined. Please check the config. ($CONFIG_FILE)" "ERROR"
             panic 2     # Special case that kills the script entirely without trying to send the e-mail (again).
         ;;
-    esac
+    esac 
     # Send the email;
     eval $mail_str
     local return_code=$?
@@ -232,7 +235,6 @@ compress() {
 			log "An error occured while compressing [$src -> $dest], 'tar' returned with error code $return_code." "WARNING"
 		fi
 	fi
-}
 
 log_rotate() {
     # Check if the logfiles exist, if so, delete them.
@@ -261,6 +263,17 @@ fi
 # Start of the script.
 log "*.bbackup.sh start.*" "INFO"
 log "Configfile => $CONFIG_FILE." "INFO"
+
+# Check if a bbackup instance is already running.
+if [ -f "/var/run/bbackup.pid" ]; then
+    log "bbackup.sh could not create a lockfile (/var/run/bbackup.pid), make sure that only one instance of bbackup.sh is running." "ERROR"
+    panic 1
+fi
+# Create lock (pid) file.
+echo "$_pid" > /var/run/bbackup.pid
+log "Created lockfile, $_pid >> /var/run/bbackup.pid"
+# Add the path to the pidfile to the cleanup function.
+CLEANUP_DEST_ARR+=("/var/run/bbackup.pid")
 
 # Check if a argument is provided.
 if [ -z "$1" ]; then
