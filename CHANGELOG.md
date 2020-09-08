@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [1.0.4] - 08.09.2020
+### Added ✨ 
+- Skipping the mounting process is now possible
+- Compression function can compress and/or archive files and folders
+- Createing a .pid file so no more than 1 instance can possibly run
+- Statistics and Analytics 
+
+### Changed ⚠️
+- Updated README.md
+- Cleaned some parts of the code
+- Better error handling and error texts
+- Logging is more beautiful
+
+### Fixed 🐞
+- Sending e-mails
+- Rsnapshot error codes
+
+
 ## [1.0.3.4] - 02.09.2020
 ### Added ✨
 - `bbackup` now locks itself (*/var/run/bbackup.pid*)
