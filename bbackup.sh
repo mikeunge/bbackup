@@ -70,7 +70,7 @@ send_email() {
         "mutt") 
             mail_str='mutt -s "$SENDER [$status] - Task: $JOB - $start_date" -a $RSNAPSHOT_LOG_FILE -- $DEST_EMAIL < $LOG_FILE' ;;
         "null" | "nil" | "none")
-            log "E-Mail functionality is turned of. If you want to activate it, change the 'MAIL_CLIENT' in your config. ($CONFIG_FILE)" "WARN"
+            log "E-Mail functionality is turned of. If you want to activate it, change the 'MAIL_CLIENT' in your config. ($CONFIG_FILE)" "WARN" ;;
         *)
             log "Could not send the e-mail; Mail client ($MAIL_CLIENT) is not (or wrong) defined. Please check the config. ($CONFIG_FILE)" "ERRO"
             panic 2     # Special case that kills the script entirely without trying to send the e-mail (again).
