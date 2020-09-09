@@ -265,10 +265,14 @@ log_rotate() {
 # If so, remove the logs for a cleaner output.
 if [[ $LOG_ROTATE == 1 ]]; then
     log "LOG_ROTATE is active." "DEBG"
-    if [[ $1 == "TEST_C" ]]; then
-        log "Test - Skipped log_rotation for test prupose, files would be deleted." "DEBG"
+    if [ -f "/var/run/bbackup.pid" ]; then
+        log "bbackup is locked (/var/run/bbackup.pid). Log rotate is active but was skipped." "WARN"
     else
-        log_rotate
+        if [[ $1 == "TEST_C" ]]; then
+            log "Test - Skipped log_rotation for test prupose, files would be deleted." "DEBG"
+        else
+            log_rotate
+        fi
     fi
 fi
 
