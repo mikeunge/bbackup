@@ -131,19 +131,19 @@ panic() {
 declare CLEANUP_DEST_ARR=()
 # Clean all the created garbage.
 cleanup() {
+    local return_code
     for dest in "${CLEANUP_DEST_ARR[@]}"
     do
         # Routine for deleting the existing src.
         if [[ -f $dest ]]; then
             # Check if the trigger is defined.
             if [[ $COMP_REM == 1 ]]; then
-                local return_code=25
                 log "Trying to delete [$dest]." "DEBG"
                 {
                     if [[ $TEST == 0 ]]; then
                         rm -rf $dest >> /dev/null 2>&1
-                        log "rm -rf $dest >> /dev/null 2>&1" "DEBG" 
                         return_code=$?
+                        log "rm -rf $dest >> /dev/null 2>&1" "DEBG" 
                     else
                         # Free the script, delete the pid.
                         if [[ $dest == *.pid ]]; then
@@ -156,19 +156,29 @@ cleanup() {
                         fi
                     fi
                 } || {
-                    log "An error occured while deleting [$dest]" "WARN"
+                    log "An error occured while deleting [$dest]" "ERRO"
                     continue
                 }
                 if [[ $return_code == 0 ]]; then
-                    log "File $dest deleted successfully." "INFO"
+                    log "File $dest deleted." "INFO"
+                elif [[ $return_code == 1 ]]; then
+                    log "Could not delete $dest." "ERRO"
                 else
-                    log "Could not delete $dest." "WARN"
-                    continue
+                    log "Something went wrong with deleting $dest (code: $return_code)." "WARN"
+                fi
+            else
+                if [[ $dest == *.pid ]]; then
+                    log "Removing lockfile ($dest)." "INFO"
+                    rm -rf $dest >> /dev/null 2>&1
+                    if [[ $? == 0 ]]; then
+                        log "bbackup.sh is free (again)." "INFO"
+                    else
+                        log "Something went wrong with deleting $dest" "WARN"
+                    fi
                 fi
             fi
         else 
             log "Destination doesn't exist. [$dest]" "DEBG"
-            continue
         fi
     done
 }
@@ -260,6 +270,9 @@ log_rotate() {
         fi
     done
 }
+
+# This is a real shitty way, i need to check if it's running like at the beginning of the script.
+# I need to move it up like before i start reading the config and initializing it or so.
 
 # Check if LOG_ROTATE is enabled.
 # If so, remove the logs for a cleaner output.
