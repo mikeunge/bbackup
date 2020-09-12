@@ -135,15 +135,16 @@ cleanup() {
     for dest in "${CLEANUP_DEST_ARR[@]}"
     do
         # Routine for deleting the existing src.
-        if [[ -f $dest ]]; then
+        if [ -f $dest ]; then
             # Check if the trigger is defined.
             if [[ $COMP_REM == 1 ]]; then
                 log "Trying to delete [$dest]." "DEBG"
                 {
+                    # Check if we are on a dry run or not.
                     if [[ $TEST == 0 ]]; then
+                        log "rm -rf $dest >> /dev/null 2>&1" "DEBG" 
                         rm -rf $dest >> /dev/null 2>&1
                         return_code=$?
-                        log "rm -rf $dest >> /dev/null 2>&1" "DEBG" 
                     else
                         # Free the script, delete the pid.
                         if [[ $dest == *.pid ]]; then
@@ -164,14 +165,15 @@ cleanup() {
                 elif [[ $return_code == 1 ]]; then
                     log "Could not delete $dest." "ERRO"
                 else
-                    log "Something went wrong with deleting $dest (code: $return_code)." "WARN"
+                    log "Something went wrong with deleting $dest, returned code: $return_code." "WARN"
                 fi
             else
                 if [[ $dest == *.pid ]]; then
                     log "Removing lockfile ($dest)." "INFO"
                     rm -rf $dest >> /dev/null 2>&1
-                    if [[ $? == 0 ]]; then
-                        log "bbackup.sh is free (again)." "INFO"
+                    return_code=$?
+                    if [[ $return_code == 0 ]]; then
+                        log "Master has presented bbackup with clothes, bbackup is free." "INFO"
                     else
                         log "Something went wrong with deleting $dest" "WARN"
                     fi
@@ -229,7 +231,7 @@ compress() {
 	if [[ $error == 1 ]]; then
 		log "One ore more errors occured, please check the log for more information." "ERRO"
 	else
-        local return_code=25
+        local return_code
 		log "Compressing [$src -> $dest]" "INFO"
 		# Suppress warning "file-changed".
  	    # This flag needs to be set, it ignores if file changes occured.
