@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # bbackup.sh
-# version: 1.0.4
+# version: 1.0.5
 #
 # Author:	Ungerböck Michele
 # Github:	github.com/mikeunge
@@ -24,7 +24,7 @@ if [ -f "$CONFIG_FILE" ]; then
     source $CONFIG_FILE
 else
     # If config is not found, log to a specific .error.log file.
-    echo "Configuration file doesn't exist! [$CONFIG_FILE]" >> /var/log/bbackup.error.log
+    printf "Configuration file doesn't exist! %s\n" $CONFIG_FILE >> /var/log/bbackup.error.log
     exit 1
 fi
 
@@ -44,13 +44,13 @@ log() {
     # Get the current datetime.
     local cur_datetime=$(date +'%d.%m.%Y %T')
 
-    # Check if file logging is enabled, else echo to stdout.
+    # Check if file logging is enabled, else print to stdout.
     if [[ $LOG_ENABLE == 1 ]]; then
     	# Write the message to the log file.
-    	echo "[$cur_datetime] :: ${priority} :: ${message}" >> $LOG_FILE
+        printf "[%s] :: [%s] :: %s\n" $cur_datetime ${priority} ${message} >> $LOG_FILE
     else
 	    # Write the message to stdout.
-	    echo "[$cur_datetime] :: ${priority} :: ${message}"
+        printf "[%s] :: [%s] :: %s\n" $cur_datetime ${priority} ${message}
     fi
 }
 
@@ -103,24 +103,24 @@ panic() {
     # Check for different error cases.
     case $error in
         1)
-            status="error"
+            status="Error"
             log "An error occured, please check the mail content and/or the attachment for more informations." "ERRO"
             send_email
             wait
             exit 1;;
         2)  # This is a special case (panic 2) that only gets triggered from the send_email function.
             # The check prevents the script from an endless loop. (=> dosn't call the send_email function like the other cases)
-            status="error"
+            status="Error"
             log "Something went wrong while sending the status mail, please check if everything is configured correctly and sending e-mails is possible from command line." "ERRO"
             exit 1 ;;
         0)
-            status="success"
+            status="Success"
             log "Backup was successfully created!" "INFO"
             send_email
             wait
             exit 0 ;;
         *)  # This should actually never happen.
-            status="warning"
+            status="Warning"
             log "A warning was raised, please check the mail content and/or the attachment for more informations." "WARN"
             send_email
             wait
@@ -136,20 +136,24 @@ cleanup() {
     do
         # Routine for deleting the existing src.
         if [ -f $dest ]; then
+            # TODO:
+            # >Move this check BEFORE the function gets called,
+            # >This just takes time and mem.
+            #
             # Check if the trigger is defined.
             if [[ $COMP_REM == 1 ]]; then
                 log "Trying to delete [$dest]." "DEBG"
                 {
                     # Check if we are on a dry run or not.
                     if [[ $TEST == 0 ]]; then
-                        log "rm -rf $dest >> /dev/null 2>&1" "DEBG" 
-                        rm -rf $dest >> /dev/null 2>&1
+                        log "rm -rf $dest >/dev/null 2>&1" "DEBG" 
+                        rm -rf $dest >/dev/null 2>&1
                         return_code=$?
                     else
                         # Free the script, delete the pid.
                         if [[ $dest == *.pid ]]; then
                             log "Test - Delting .pid file to free script." "DEBG"
-                            rm -rf $dest >> /dev/null 2>&1
+                            rm -rf $dest >/dev/null 2>&1
                             return_code=$?
                         else
                             log "Test - Destination [$dest] would be deleted." "DEBG"
@@ -170,7 +174,7 @@ cleanup() {
             else
                 if [[ $dest == *.pid ]]; then
                     log "Removing lockfile ($dest)." "INFO"
-                    rm -rf $dest >> /dev/null 2>&1
+                    rm -rf $dest >/dev/null 2>&1
                     return_code=$?
                     if [[ $return_code == 0 ]]; then
                         log "Master has presented bbackup with clothes, bbackup is free." "INFO"
@@ -237,14 +241,17 @@ compress() {
  	    # This flag needs to be set, it ignores if file changes occured.
         # If it detects a change, it will simply ignore it, else it would need manual accaptance (eg. ENTER).
         if [[ $TEST == 0 ]]; then
+            # TODO:
+            # >Add compression levels as well as default check.
+            #
             # This COMP_MOD trigger can be set in the configuration file.
             # The tar (only) mode creates an uncompressed tar file where as the default is bz2.
             case $COMP_MOD in
-                "tar") tar --warning=no-file-changed -cPf $dest $src >> /dev/null 2>&1 ;;
-                "bz2" | "bzip2") tar --warning=no-file-changed -cP --bzip2 -f $dest $src >> /dev/null 2>&1 ;;
-                "gz" | "gzip") tar --warning=no-file-changed -cP --gzip -f $dest $src >> /dev/null 2>&1;;
-                "lzma") tar --warning=no-file-changed -cP --lzma -f $dest $src >> /dev/null 2>&1 ;;
-                *) tar --warning=no-file-changed -cP --bzip2 -f $dest $src >> /dev/null 2>&1 ;;
+                "tar") tar --warning=no-file-changed -cPf $dest $src >/dev/null 2>&1 ;;
+                "bz2" | "bzip2") tar --warning=no-file-changed -cP --bzip2 -f $dest $src >/dev/null 2>&1 ;;
+                "gz" | "gzip") tar --warning=no-file-changed -cP --gzip -f $dest $src >/dev/null 2>&1;;
+                "lzma") tar --warning=no-file-changed -cP --lzma -f $dest $src >/dev/null 2>&1 ;;
+                *) tar --warning=no-file-changed -cP --bzip2 -f $dest $src >/dev/null 2>&1 ;;
             esac
             return_code=$?
         else
@@ -302,7 +309,7 @@ if [ -f "/var/run/bbackup.pid" ]; then
 fi
 
 # Create lock (pid) file.
-echo "$_pid" >> /var/run/bbackup.pid
+printf "%s\n" $_pid >> /var/run/bbackup.pid
 log "Created lockfile, $_pid >> /var/run/bbackup.pid" "INFO"
 # Add the path to the pidfile to the cleanup function.
 CLEANUP_DEST_ARR+=("/var/run/bbackup.pid")
@@ -345,7 +352,7 @@ if [[ $MOUNT_ENABLED == 1 ]]; then
         if ! grep -q "$MOUNT" /proc/mounts; then
             { # Try to mount the network drive.
                 log "Mounting share ... [$SHARE]" "DEBG"
-                mount -t cifs -o username="$USER",password="$PASSWORD" "$SHARE" "$MOUNT" >> /dev/null 2>&1
+                mount -t cifs -o username="$USER",password="$PASSWORD" "$SHARE" "$MOUNT" >/dev/null 2>&1
                 log "Network share successfully mounted!" "INFO"
                 break
             } || {
