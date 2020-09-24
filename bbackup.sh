@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # bbackup.sh
-# version: 1.0.5
+# version: 1.0.6
 #
 # Author:	Ungerböck Michele
 # Github:	github.com/mikeunge
@@ -248,9 +248,9 @@ compress() {
             # The tar (only) mode creates an uncompressed tar file where as the default is bz2.
             case $COMP_MOD in
                 "tar") tar --warning=no-file-changed -cPf $dest $src >/dev/null 2>&1 ;;
-                "bz2" | "bzip2") tar --warning=no-file-changed -cP --bzip2 -f $dest $src >/dev/null 2>&1 ;;
-                "gz" | "gzip") tar --warning=no-file-changed -cP --gzip -f $dest $src >/dev/null 2>&1;;
-                "lzma") tar --warning=no-file-changed -cP --lzma -f $dest $src >/dev/null 2>&1 ;;
+                "bz2" | "bzip2") tar --warning=no-file-changed -cP --bzip2 -$COMP_LVL -f $dest $src >/dev/null 2>&1 ;;
+                "gz" | "gzip") tar --warning=no-file-changed -cP --gzip -$COMP_LVL -f $dest $src >/dev/null 2>&1;;
+                "lzma") tar --warning=no-file-changed -cP --lzma -$COMP_LVL -f $dest $src >/dev/null 2>&1 ;;
                 *) tar --warning=no-file-changed -cP --bzip2 -f $dest $src >/dev/null 2>&1 ;;
             esac
             return_code=$?
@@ -438,6 +438,14 @@ if [[ $COMPRESS == 1 ]]; then
             "lzma") dest="$COMP_TMP$dest_elem.tar.lzma" ;;
             *) dest="$COMP_TMP$dest_elem.tar.bz2" ;;
         esac
+
+        # Set the default compression level if nothing is set.
+        if ! [ $COMP_MOD == "tar" ]; then
+            if [ -z $COMP_LVL ]; then
+                COMP_LVL=3
+            fi
+        fi
+
         # Add the destination to the CLEANUP array so they will get later deleted.
         CLEANUP_DEST_ARR+=($dest)
 		# Compress each element.
