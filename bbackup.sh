@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # bbackup.sh
-# version: 1.0.6
+# version: 1.0.6.1
 #
 # Author:	Ungerböck Michele
 # Github:	github.com/mikeunge
@@ -24,7 +24,7 @@ if [ -f "$CONFIG_FILE" ]; then
     source $CONFIG_FILE
 else
     # If config is not found, log to a specific .error.log file.
-    printf "Configuration file doesn't exist! %s\n" $CONFIG_FILE >> /var/log/bbackup.error.log
+    printf "Configuration file doesn't exist! %s\n" "$CONFIG_FILE" >> /var/log/bbackup.error.log
     exit 1
 fi
 
@@ -47,10 +47,10 @@ log() {
     # Check if file logging is enabled, else print to stdout.
     if [[ $LOG_ENABLE == 1 ]]; then
     	# Write the message to the log file.
-        printf "[%s] :: [%s] :: %s\n" $cur_datetime ${priority} ${message} >> $LOG_FILE
+        printf "[%s] :: [%s] :: %s\n" "$cur_datetime" "${priority}" "${message}" >> $LOG_FILE
     else
 	    # Write the message to stdout.
-        printf "[%s] :: [%s] :: %s\n" $cur_datetime ${priority} ${message}
+        printf "[%s] :: [%s] :: %s\n" "$cur_datetime" "${priority}" "${message}"
     fi
 }
 
@@ -309,7 +309,7 @@ if [ -f "/var/run/bbackup.pid" ]; then
 fi
 
 # Create lock (pid) file.
-printf "%s\n" $_pid >> /var/run/bbackup.pid
+printf "%s\n" "$_pid" >> /var/run/bbackup.pid
 log "Created lockfile, $_pid >> /var/run/bbackup.pid" "INFO"
 # Add the path to the pidfile to the cleanup function.
 CLEANUP_DEST_ARR+=("/var/run/bbackup.pid")
