@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6.2] - 29.09.2020
+### Fixed 🐞
+- Fixed the tar compression error by outsourcing the compression level based on the compression algorithm
+
+
 ## [1.0.6.1] - 28.09.2020
 ### Fixed 🐞
 - The 'printf' output was bricked, all it took to fix are quatation marks for the $variables

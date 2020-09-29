@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # bbackup.sh
-# version: 1.0.6.1
+# version: 1.0.6.2
 #
 # Author:	Ungerböck Michele
 # Github:	github.com/mikeunge
@@ -241,17 +241,22 @@ compress() {
  	    # This flag needs to be set, it ignores if file changes occured.
         # If it detects a change, it will simply ignore it, else it would need manual accaptance (eg. ENTER).
         if [[ $TEST == 0 ]]; then
-            # TODO:
-            # >Add compression levels as well as default check.
-            #
             # This COMP_MOD trigger can be set in the configuration file.
             # The tar (only) mode creates an uncompressed tar file where as the default is bz2.
             case $COMP_MOD in
                 "tar") tar --warning=no-file-changed -cPf $dest $src >/dev/null 2>&1 ;;
-                "bz2" | "bzip2") tar --warning=no-file-changed -cP --bzip2 -$COMP_LVL -f $dest $src >/dev/null 2>&1 ;;
-                "gz" | "gzip") tar --warning=no-file-changed -cP --gzip -$COMP_LVL -f $dest $src >/dev/null 2>&1;;
-                "lzma") tar --warning=no-file-changed -cP --lzma -$COMP_LVL -f $dest $src >/dev/null 2>&1 ;;
-                *) tar --warning=no-file-changed -cP --bzip2 -f $dest $src >/dev/null 2>&1 ;;
+                "bz2" | "bzip2") 
+                    BZIP2=-$COMP_LVL
+                    tar --warning=no-file-changed -cP --bzip2 -f $dest $src >/dev/null 2>&1 ;;
+                "gz" | "gzip") 
+                    GZIP=-$COMP_LVL
+                    tar --warning=no-file-changed -cP --gzip -f $dest $src >/dev/null 2>&1;;
+                "lzma")
+                    LZMA=-$COMP_LVL
+                    tar --warning=no-file-changed -cP --lzma -f $dest $src >/dev/null 2>&1 ;;
+                *)
+                    BZIP2=-$COMP_LVL
+                    tar --warning=no-file-changed -cP --bzip2 -f $dest $src >/dev/null 2>&1 ;;
             esac
             return_code=$?
         else
@@ -262,7 +267,7 @@ compress() {
 		if [[ $return_code == 0 ]]; then
 			log "Compression [$src -> $dest] succeeded." "INFO"
 		else
-			log "An error occured while compressing [$src -> $dest], 'tar' returned with error code $return_code." "WARN"
+			log "An error occured while compressing [$src -> $dest], 'tar' returned with error code $return_code." "ERRO"
 		fi
 	fi
 }
