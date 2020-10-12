@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6.3] - 06.10.2020
+### Added ✨
+- File sizes as well as complete backup sizes 
+
+### Changed ⚠️
+- Completly rebuilt the mounting option, adde more checks to make sure the mount exists
+- rsnapshot does **NOT** get the output checked (besides the *TEST_C*)
+
+
 ## [1.0.6.2] - 29.09.2020
 ### Fixed 🐞
 - Fixed the tar compression error by outsourcing the compression level based on the compression algorithm
