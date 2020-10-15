@@ -93,6 +93,18 @@ panic() {
     local error=0
     local status=""
 
+    # Unmount network share (if set)
+    if [ $UMOUNT = 1 ]; then
+        log "Unmounting network share." "INFO"
+        unmount -f $MOUNT >/dev/null 2>&1
+
+        if [ $? = 0 ]; then
+            log "$MOUNT successfully unmounted." "INFO"
+        else
+            log "Something went wrong while unmounting drive $MOUNT" "WARN"
+        fi
+    fi
+
     # Check if a argument is provided.
     if [ -z "$1" ]; then
         error=1
@@ -264,8 +276,8 @@ compress() {
             # Get the size of the source and destination.
             local size_src
             local size_dest
-            size_src=$(du -h $src | awk '{print $1}')
-            size_dest=$(du -h $dest | awk '{print $1}')
+            size_src=$(du -hs $src | awk '{print $1}')
+            size_dest=$(du -hs $dest | awk '{print $1}')
             log "Compression $src (Size: $size_src) -> $dest (Size: $size_dest) succeeded." "INFO"
 		else
 			log "An error occured while compressing [$src -> $dest], 'tar' returned with error code $return_code." "ERRO"
@@ -373,7 +385,7 @@ if [[ $MOUNT_ENABLED == 1 ]]; then
                 break
             else
                 log "Could not mount network share, try $i/$TRIES" "WARN"
-                if [[ $i >= $TRIES ]]; then
+                if [ $i > $TRIES ]; then
                     log "Could not mount the network share $TRIES, exiting!" "ERRO"
                     panic 1
                 fi
