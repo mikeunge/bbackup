@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # bbackup.sh
-# version: 1.0.6.2
+# version: 1.0.6.3
 #
 # Author:	Ungerböck Michele
 # Github:	github.com/mikeunge
@@ -237,9 +237,6 @@ compress() {
 	else
         local return_code
 		log "Compressing [$src -> $dest]" "INFO"
-		# Suppress warning "file-changed".
- 	    # This flag needs to be set, it ignores if file changes occured.
-        # If it detects a change, it will simply ignore it, else it would need manual accaptance (eg. ENTER).
         if [[ $TEST == 0 ]]; then
             # This COMP_MOD trigger can be set in the configuration file.
             # The tar (only) mode creates an uncompressed tar file where as the default is bz2.
@@ -250,8 +247,7 @@ compress() {
                     tar --warning=no-file-changed -cP --bzip2 -f $dest $src >/dev/null 2>&1 ;;
                 "gz" | "gzip") 
                     GZIP=-$COMP_LVL
-                    tar --warning=no-file-changed -cP --gzip -f $dest $src >/dev/null 2>&1;;
-                "lzma")
+                    tar --warning=no-file-changed -cP --gzip -f $dest $src >/dev/null 2>&1;; "lzma")
                     LZMA=-$COMP_LVL
                     tar --warning=no-file-changed -cP --lzma -f $dest $src >/dev/null 2>&1 ;;
                 *)
@@ -265,7 +261,12 @@ compress() {
         fi
 		# Check the 'tar' return code.
 		if [[ $return_code == 0 ]]; then
-			log "Compression [$src -> $dest] succeeded." "INFO"
+            # Get the size of the source and destination.
+            local size_src
+            local size_dest
+            size_src=$(du -h $src | awk '{print $1}')
+            size_dest=$(du -h $dest | awk '{print $1}')
+            log "Compression $src (Size: $size_src) -> $dest (Size: $size_dest) succeeded." "INFO"
 		else
 			log "An error occured while compressing [$src -> $dest], 'tar' returned with error code $return_code." "ERRO"
 		fi
@@ -352,33 +353,42 @@ fi
 # Try to mount the network drive.
 # 
 if [[ $MOUNT_ENABLED == 1 ]]; then
+    # Check if the $MOUNT ends with a /
+    # If so, trim it, eg. /mnt/nas/ => /mnt/nas
+    if [[ "$MOUNT" == */ ]]; then
+        MOUNT="${MOUNT%?}"
+    fi
+    # Check if the mount point exists.
+    if ! [ -d $MOUNT ]; then
+        log "Mount point ($MOUNT) does not exist, exiting." "ERRO"
+        panic 1
+    fi
+
     i=0
     while [[ $i < $TRIES ]]; do
-        if ! grep -q "$MOUNT" /proc/mounts; then
-            { # Try to mount the network drive.
-                log "Mounting share ... [$SHARE]" "DEBG"
-                mount -t cifs -o username="$USER",password="$PASSWORD" "$SHARE" "$MOUNT" >/dev/null 2>&1
-                log "Network share successfully mounted!" "INFO"
+        if ! mount | grep $MOUNT >/dev/null 2>&1; then
+            log "Mounting share [$SHARE]" "DEBG"
+            mount -t cifs -o username="$USER",password="$PASSWORD" "$SHARE" "$MOUNT" >/dev/null 2>&1
+            if [[ $? == 0 ]]; then
                 break
-            } || {
-                (( i=i+1 ))
-                log "[$i/$TRIES] Could not mount network share! ... [$SHARE -> $MOUNT]" "WARN"
-                if [[ i == $TRIES ]]; then
-                    log "Could not mount the network share $TRIES times!\nExiting script!" "ERRO"
+            else
+                log "Could not mount network share, try $i/$TRIES" "WARN"
+                if [[ $i >= $TRIES ]]; then
+                    log "Could not mount the network share $TRIES, exiting!" "ERRO"
                     panic 1
                 fi
-            }
+                (( i++ ))
+            fi
         else
             log "Network share is already mounted." "INFO"
             break
         fi
     done
 else 
-    log "Network mount is disabled, if you want to change it, set MOUNT_ENABLED to '1' in your configuration." "INFO"
+    log "Network mount is disabled, if you want to change it, set MOUNT_ENABLED to '1' in your configuration." "WARN"
 fi
 
-# Compression implementation.
-if [[ $COMPRESS == 1 ]]; then
+# Compression implementation.  if [[ $COMPRESS == 1 ]]; then
     # Define a 'local' error count.
     error=0
 
@@ -481,18 +491,14 @@ else
     log "Test - rsnapshot job: $cmd" "DEBG"
 fi
 
-# Execute rsnapshot and store the output.
-output=`$cmd`
-
 # If test, log the rsnapshot output.
 if [[ $TEST > 0 ]]; then
+    output=`$cmd`
     log "Test - rSnapshot output." "DEBG"
     log "Test - $output" "DEBG"
-fi
-
-# Check if the rsnapshot output is empty or not.
-if [[ $output == "" ]]; then
-    log "rSnapshot didn't return any output. Check the rsnapshot.log for more information." "WARN"
+else
+    # Execute the built command.
+    eval $cmd
 fi
 
 # Check exit codes.
@@ -504,15 +510,21 @@ else
     err=1
 fi
 
+# Get the size of the backup.
+backup_size=$(du -hs $COMP_TMP | awk '{print $1}')
+
 # Start the cleanup routine.
 cleanup
 
 # Mark the end of the script.
 script_end=$(date +'%d.%m.%Y %T')
 calc_end=$(date +'%Y-%m-%d %T')
-log "Start: $script_start :: End: $script_end" "INFO"
+
 # Calculate the difference between script start and script finished.
 calc_time "$(($(date -d "$calc_end" '+%s') - $(date -d "$calc_start" '+%s')))"
+
+# End of the script.
+log "Start: $script_start :: End: $script_end :: Total: $backup_size" "INFO"
 
 # Make sure no errors occured.
 if [[ $err > 0 ]]; then
