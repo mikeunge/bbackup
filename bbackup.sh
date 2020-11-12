@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # bbackup.sh
-# version: 1.0.6.3
+# version: 1.0.6.4
 #
 # Author:	Ungerböck Michele
 # Github:	github.com/mikeunge
@@ -55,20 +55,36 @@ log() {
 }
 
 send_email() {
+    # Declare that the rsnapshot.log exists, if not, it'll get changed below.
+    local rsnapshot_exists=1
+
     # Check if attachment exists.
     if ! [ -f $RSNAPSHOT_LOG_FILE ]; then
         log "rsnapshot logfile does not exist, attachment cannot be attached." "WARN"
+        rsnapshot_exists=0
     fi
     log "Sending email via $MAIL_CLIENT..." "DEBG"
     local mail_str=""
     # Check if the mail_client is defined correctly.
     case $MAIL_CLIENT in
         "sendmail")
-            mail_str='sendmail -t $DEST_EMAIL -m "$SENDER [$status] - Task: $JOB - $start_date" -a $RSNAPSHOT_LOG_FILE' ;;
+            if [[ $rsnapshot_exists > 0 ]]; then
+                mail_str='sendmail -t $DEST_EMAIL -m "$SENDER [$status] - Task: $JOB - $start_date" -a $RSNAPSHOT_LOG_FILE'
+            else
+                mail_str='sendmail -t $DEST_EMAIL -m "$SENDER [$status] - Task: $JOB - $start_date"'
+            fi ;;
         "mail")
-            mail_str='mail -a $RSNAPSHOT_LOG_FILE -s "$SENDER [$status] - Task: $JOB - $start_date" $DEST_EMAIL < $LOG_FILE' ;;
+            if [[ $rsnapshot_exists > 0 ]]; then
+                mail_str='mail -A $RSNAPSHOT_LOG_FILE -s "$SENDER [$status] - Task: $JOB - $start_date" $DEST_EMAIL < $LOG_FILE'
+            else
+                mail_str='mail -s "$SENDER [$status] - Task: $JOB - $start_date" $DEST_EMAIL < $LOG_FILE'
+            fi ;;
         "mutt") 
-            mail_str='mutt -s "$SENDER [$status] - Task: $JOB - $start_date" -a $RSNAPSHOT_LOG_FILE -- $DEST_EMAIL < $LOG_FILE' ;;
+            if [[ $rsnapshot_exists > 0 ]]; then
+                mail_str='mutt -s "$SENDER [$status] - Task: $JOB - $start_date" -a $RSNAPSHOT_LOG_FILE -- $DEST_EMAIL < $LOG_FILE'
+            else
+                mail_str='mutt -s "$SENDER [$status] - Task: $JOB - $start_date" -- $DEST_EMAIL < $LOG_FILE'
+            fi ;;
         "null" | "nil" | "none")
             log "E-Mail functionality is turned of. If you want to activate it, change the 'MAIL_CLIENT' in your config. ($CONFIG_FILE)" "WARN" ;;
         *)
@@ -92,6 +108,20 @@ panic() {
     # Define vars.
     local error=0
     local status=""
+
+    # Unmount network share (if set)
+    if [[ $UMOUNT == 1 ]]; then
+        log "Unmounting network share." "INFO"
+        unmount -f $MOUNT >/dev/null 2>&1
+
+        if [[ $? == 0 ]]; then
+            log "$MOUNT successfully unmounted." "INFO"
+        else
+            log "Something went wrong while unmounting drive $MOUNT" "WARN"
+        fi
+    fi
+
+    cleanup
 
     # Check if a argument is provided.
     if [ -z "$1" ]; then
@@ -247,7 +277,8 @@ compress() {
                     tar --warning=no-file-changed -cP --bzip2 -f $dest $src >/dev/null 2>&1 ;;
                 "gz" | "gzip") 
                     GZIP=-$COMP_LVL
-                    tar --warning=no-file-changed -cP --gzip -f $dest $src >/dev/null 2>&1;; "lzma")
+                    tar --warning=no-file-changed -cP --gzip -f $dest $src >/dev/null 2>&1 ;;
+                "lzma")
                     LZMA=-$COMP_LVL
                     tar --warning=no-file-changed -cP --lzma -f $dest $src >/dev/null 2>&1 ;;
                 *)
@@ -264,8 +295,9 @@ compress() {
             # Get the size of the source and destination.
             local size_src
             local size_dest
-            size_src=$(du -h $src | awk '{print $1}')
-            size_dest=$(du -h $dest | awk '{print $1}')
+            size_src=$(du -hs $src | awk '{print $1}') &
+            size_dest=$(du -hs $dest | awk '{print $1}') &
+            wait
             log "Compression $src (Size: $size_src) -> $dest (Size: $size_dest) succeeded." "INFO"
 		else
 			log "An error occured while compressing [$src -> $dest], 'tar' returned with error code $return_code." "ERRO"
@@ -343,15 +375,20 @@ fi
 
 # Check if the second job is executed.
 if [[ $SEC_JOB == $JOB ]]; then
-    log "Second job got triggered, share has changed. [$SHARE => $SEC_SHARE]" "INFO"
-    SHARE="$SEC_SHARE"
+    if ! [ -z "$SEC_SHARE" ]; then
+        log "Second job got triggered, share has changed. [$SHARE => $SEC_SHARE]" "INFO"
+        SHARE="$SEC_SHARE"
+    fi
+    if ! [ -z "$SEC_MOUNT" ]; then
+        log "Second job got triggered, mount has changed. [$MOUNT => $SEC_MOUNT]" "INFO"
+        MOUNT="$SEC_MOUNT"
+    fi
 fi
 
 # Check if mounting is enabled, if not it will skip the process.
 # If it's disabled make sure the correct paths are set in the rsnapshot configuration!
 #
 # Try to mount the network drive.
-# 
 if [[ $MOUNT_ENABLED == 1 ]]; then
     # Check if the $MOUNT ends with a /
     # If so, trim it, eg. /mnt/nas/ => /mnt/nas
@@ -366,6 +403,7 @@ if [[ $MOUNT_ENABLED == 1 ]]; then
 
     i=0
     while [[ $i < $TRIES ]]; do
+        ((i=i+1))
         if ! mount | grep $MOUNT >/dev/null 2>&1; then
             log "Mounting share [$SHARE]" "DEBG"
             mount -t cifs -o username="$USER",password="$PASSWORD" "$SHARE" "$MOUNT" >/dev/null 2>&1
@@ -373,11 +411,10 @@ if [[ $MOUNT_ENABLED == 1 ]]; then
                 break
             else
                 log "Could not mount network share, try $i/$TRIES" "WARN"
-                if [[ $i >= $TRIES ]]; then
+                if [[ $i == $TRIES ]]; then
                     log "Could not mount the network share $TRIES, exiting!" "ERRO"
                     panic 1
                 fi
-                (( i++ ))
             fi
         else
             log "Network share is already mounted." "INFO"
@@ -389,6 +426,7 @@ else
 fi
 
 # Compression implementation.  if [[ $COMPRESS == 1 ]]; then
+if [[ $COMPRESS == 1 ]]; then
     # Define a 'local' error count.
     error=0
 
@@ -484,7 +522,20 @@ fi
 log "Starting rSnapshot job ... [$JOB]" "INFO"
 # Run the rsnapshot backup job.
 if [[ $TEST == 0 ]]; then
-    cmd="$RSNAPSHOT $JOB"
+    # Check if any EXEC_MODE is specified.
+    case "$EXEC_MODE" in
+        "quiet")
+            log "rsnapshot EXEC_MODE was changed to '$EXEC_MODE'" "INFO"
+            cmd="$RSNAPSHOT -q $JOB" ;;
+        "verbose")
+            log "rsnapshot EXEC_MODE was changed to '$EXEC_MODE'" "INFO"
+            cmd="$RSNAPSHOT -V $JOB" ;;
+        "diagnose")
+            log "rsnapshot EXEC_MODE was changed to '$EXEC_MODE'" "INFO"
+            cmd="$RSNAPSHOT -D $JOB" ;;
+        *)
+            cmd="$RSNAPSHOT $JOB" ;;
+    esac
 else
     cmd="$RSNAPSHOT -t $JOB"
     log "Test - Executing rsnapshot with it's test parameter." "DEBG"
@@ -512,9 +563,6 @@ fi
 
 # Get the size of the backup.
 backup_size=$(du -hs $COMP_TMP | awk '{print $1}')
-
-# Start the cleanup routine.
-cleanup
 
 # Mark the end of the script.
 script_end=$(date +'%d.%m.%Y %T')
