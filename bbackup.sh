@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # bbackup.sh
-# version: 1.0.6.3
+# version: 1.0.6.4
 #
 # Author:	Ungerböck Michele
 # Github:	github.com/mikeunge
@@ -522,7 +522,20 @@ fi
 log "Starting rSnapshot job ... [$JOB]" "INFO"
 # Run the rsnapshot backup job.
 if [[ $TEST == 0 ]]; then
-    cmd="$RSNAPSHOT $JOB"
+    # Check if any EXEC_MODE is specified.
+    case "$EXEC_MODE" in
+        "quiet")
+            log "rsnapshot EXEC_MODE was changed to '$EXEC_MODE'" "INFO"
+            cmd="$RSNAPSHOT -q $JOB" ;;
+        "verbose")
+            log "rsnapshot EXEC_MODE was changed to '$EXEC_MODE'" "INFO"
+            cmd="$RSNAPSHOT -V $JOB" ;;
+        "diagnose")
+            log "rsnapshot EXEC_MODE was changed to '$EXEC_MODE'" "INFO"
+            cmd="$RSNAPSHOT -D $JOB" ;;
+        *)
+            cmd="$RSNAPSHOT $JOB" ;;
+    esac
 else
     cmd="$RSNAPSHOT -t $JOB"
     log "Test - Executing rsnapshot with it's test parameter." "DEBG"
