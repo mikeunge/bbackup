@@ -426,6 +426,7 @@ else
 fi
 
 # Compression implementation.  if [[ $COMPRESS == 1 ]]; then
+if [[ $COMPRESS == 1 ]]; then
     # Define a 'local' error count.
     error=0
 
