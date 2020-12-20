@@ -19,16 +19,10 @@ To function properly it depends on others work such as:
     - **tar** for compressing the files/folders
 
 
-### Usage
+### Thanks
 
-I think this script will most likely be run by a *cron daemon*, so here is a blueprint of one of my production machines:
-
-`# Runs bbackup.sh with command daily (executes: rsnapshot daily)`
-`00 19 * * 1-5 bash /root/maint/bbackup/bbackup.sh daily`
-`# Execute bbackup.sh on sundays only.`
-`00 19 * * 0 bash /root/maint/bbackup/bbackup.sh weekly`
-`# Create a monthly backup on every first (1.) of a month.`
-`00 19 1 * * bash /root/maint/bbackup/bbackup.sh monthly`
+I really want to thank [Zordrak](https://github.com/Zordrak/bashlog) for his awesome 'bash logger'.
+It really helped me develop the new features and extend it's possibilitys.
 
 
 ### Todo
@@ -42,6 +36,5 @@ I think this script will most likely be run by a *cron daemon*, so here is a blu
 - [x] Use local variables instead of global once
 - [x] Add a test functionallity
 - [ ] Bug fixes and tests...
-- [ ] ~Use rsync instead of rsnapshot when compression is turned on~
 
 
