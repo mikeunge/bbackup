@@ -193,105 +193,104 @@ log_rotate() {
         fi
     done
 }
-
-
-# Store the pid for bbackup.sh as $_pid.
+#
+# ----------- Start of the script -----------
+#
 _pid=$$ 
 start_date=$(date +'%d.%m.%Y')
-script_start=$(date +'%d.%m.%Y %T')
-calc_start=$(date +'%Y-%m-%d %T')
+start_datetime=$(date +'%d.%m.%Y %T')
+analytics_start=$(date +'%Y-%m-%d %T')
 
-# Load the config.
-CONFIG_FILE="/etc/bbackup.conf"   # change this path if needed
+if [[ $# == 0 ]]; then
+    log info "No arguments provided, fallback to default job => $DEFAULT_TASK.";
+    TASK="$DEFAULT_TASK";
+    TEST=0;
+else
+    argparser;
+    if ! [[ "$ARG_CONFIG" == 0 ]]; then
+        CONFIG_FILE="$ARG_CONFIG";
+    else
+        CONFIG_FILE="/etc/bbackup.conf";
+    fi
+    if ! [[ "$ARG_TASK" == 0 ]]; then
+        TASk="$ARG_TASK";
+    else
+        TASK="$DEFAULT_TASK";
+    fi
+    if ! [[ "$ARG_TEST" == 0 ]]; then
+        TEST=1;
+    else
+        TEST=0;
+    fi
+fi
 if [ -f "$CONFIG_FILE" ]; then
     {
-        source $CONFIG_FILE
+        source $CONFIG_FILE;
     } || {
-        printf "Could not source config file '%s'." "$CONFIG_FILE"
-        printf "Could not source config file '%s'." "$CONFIG_FILE" >> /var/log/bbackup.error.log
-        exit 1
+        printf "Could not source config file, make sure it's readable and the permissions are granted. Path: '%s'" "$CONFIG_FILE" >> /var/log/bbackup.error.log;
+        exit 1;
     }
 else
-    printf "Configuration file doesn't exist! %s\n" "$CONFIG_FILE"
-    printf "Configuration file doesn't exist! %s\n" "$CONFIG_FILE" >> /var/log/bbackup.error.log
-    exit 1
+    printf "Configuration file doesn't exist! Path: '%s'\n" "$CONFIG_FILE" >> /var/log/bbackup.error.log;
+    exit 1;
 fi
 
-# import the libraries
-libs=("./libs/timer.sh" "./libs/notification.sh" "./libs/log.sh")
+# Import the libraries
+# On failure the script exits
+libs=("./libs/timer.sh" "./libs/notification.sh" "./libs/log.sh" "./libs/argparser.sh");
 for lib in "${libs[@]}"; do
     if [ -f "$lib" ]; then
         {
-            source $lib
+            source $lib;
         } || {
-            printf "Import error, could not import library: %s\n" "$lib" 
-            printf "Import error, could not import library: %s\n" "$lib" >> /var/log/bbackup.error.log 
-            exit 1
+            printf "Import error, could not import library: %s\n" "$lib" >> /var/log/bbackup.error.log;
+            exit 1;
         }
     else
-        printf "Lib '%s' does not exist, script cannot run any longer." "$lib"
-        printf "Lib '%s' does not exist, script cannot run any longer." "$lib" >> /var/log/bbackup.error.log
-        exit 1
+        printf "Lib '%s' does not exist, script cannot run any longer." "$lib" >> /var/log/bbackup.error.log;
+        exit 1;
     fi
 done
 
 # Define the BASHLOG paths configs
+# Modify the destination paths of the logging file for 
+# either plain or json.
 if [[ $BASHLOG_JSON == 1 ]]; then
-    LOG_FILE=$LOG_FILE".json"
-    BASHLOG_JSON_PATH=$LOG_FILE
+    LOG_FILE=$LOG_FILE".json";
+    BASHLOG_JSON_PATH=$LOG_FILE;
+    json_path=$LOG_FILE;
 else
-    BASHLOG_FILE_PATH=$LOG_FILE
+    BASHLOG_FILE_PATH=$LOG_FILE;
+    file_path=$LOG_FILE;
+fi
+
+# Check if a bbackup instance is already running.
+if [ -f "/var/run/bbackup.pid" ]; then
+    log error "bbackup.sh could not create a lockfile (/var/run/bbackup.pid), make sure that only one instance of bbackup.sh is running.";
+    panic 1;
 fi
 
 if [[ $LOG_ROTATE == 1 ]]; then
     if [[ $1 == "TEST" ]]; then
-        return 0
+        return 0;
     fi
-    log debug "LOG_ROTATE is active." 
+    log debug "LOG_ROTATE is active.";
     if [ -f "/var/run/bbackup.pid" ]; then
-        log warn "bbackup is locked (/var/run/bbackup.pid). Log rotate is active but was skipped."
+        log warn "bbackup is locked (/var/run/bbackup.pid). Log rotate is active but was skipped.";
     else
-        log_rotate
+        log_rotate;
     fi
 fi
 
-# Start of the script.
-log info "*.bbackup.sh start.*"
-log info "Configfile => $CONFIG_FILE."
-
-# Check if a bbackup instance is already running.
-if [ -f "/var/run/bbackup.pid" ]; then
-    log error "bbackup.sh could not create a lockfile (/var/run/bbackup.pid), make sure that only one instance of bbackup.sh is running."
-    panic 1
-fi
-
-# Create lock (pid) file.
-printf "%s\n" "$_pid" >> /var/run/bbackup.pid
-log info "Created lockfile, $_pid >> /var/run/bbackup.pid" 
-# Add the path to the pidfile to the cleanup function.
-CLEANUP_DEST_ARR+=("/var/run/bbackup.pid")
-
-# Check if a argument is provided.
-if [ -z "$1" ]; then
-    log warn "No argument supplied, fallback to config defined job => $DEFAULT_JOB."
-    JOB="$DEFAULT_JOB"
-    TEST=0
-fi
-# TODO: check for provided arguments such as --config, ... then execute the corresponding function
-case $1 in
-    "TEST") 
-        TEST=1
-        LOG_ENABLE=0
-        LOG_LEVEL="DEBG"
-        log debug "Initializing test case." ;; 
-    *)
-        JOB=$1
-        TEST=0
-        log debug "Executed job => $JOB." ;; 
-esac
+log info "*.bbackup.sh start.*";
+# Create lock (pid) file
+printf "%s\n" "$_pid" >> /var/run/bbackup.pid;
+log info "Created lockfile, $_pid >> /var/run/bbackup.pid"; 
+CLEANUP_DEST_ARR+=("/var/run/bbackup.pid");   # add the path for later cleanup
+log info "Configfile => $CONFIG_FILE";
 
 # Check if the second job is executed.
-if [[ $JOB == $SEC_JOB ]]; then
+if [[ $TASk == $SEC_TASK ]]; then
     if ! [ -z "$SEC_SHARE" ]; then
         log info "Second job got triggered, share has changed. [$SHARE => $SEC_SHARE]"
         SHARE="$SEC_SHARE"
@@ -430,25 +429,25 @@ if [[ $COMPRESS == 1 ]]; then
 fi
 
 # Actual backup starts here.
-log info "Starting rSnapshot job ... [$JOB]" 
+log info "Starting rSnapshot job ... [$TASK]" 
 # Run the rsnapshot backup job.
 if [[ $TEST == 0 ]]; then
     # Check if any EXEC_MODE is specified.
     case "$EXEC_MODE" in
         "quiet")
             log info "rsnapshot EXEC_MODE was changed to '$EXEC_MODE'" 
-            cmd="$RSNAPSHOT -q $JOB" ;;
+            cmd="$RSNAPSHOT -q $TASK" ;;
         "verbose")
             log info "rsnapshot EXEC_MODE was changed to '$EXEC_MODE'"
-            cmd="$RSNAPSHOT -V $JOB" ;;
+            cmd="$RSNAPSHOT -V $TASK" ;;
         "diagnose")
             log info "rsnapshot EXEC_MODE was changed to '$EXEC_MODE'"
-            cmd="$RSNAPSHOT -D $JOB" ;;
+            cmd="$RSNAPSHOT -D $TASK" ;;
         *)
-            cmd="$RSNAPSHOT $JOB" ;;
+            cmd="$RSNAPSHOT $TASK" ;;
     esac
 else
-    cmd="$RSNAPSHOT -t $JOB"
+    cmd="$RSNAPSHOT -t $TASk"
     log debug "Test - Executing rsnapshot with it's test parameter."
     log debug "Test - rsnapshot job: $cmd" 
 fi
@@ -476,12 +475,12 @@ fi
 backup_size=$(du -hs $COMP_TMP | awk '{print $1}')
 
 # Mark the end of the script.
-script_end=$(date +'%d.%m.%Y %T')
-calc_end=$(date +'%Y-%m-%d %T')
+end_datetime=$(date +'%d.%m.%Y %T')
+analytics_end=$(date +'%Y-%m-%d %T')
 
 # Calculate the difference between script start and script finished.
-calc_time "$(($(date -d "$calc_end" '+%s') - $(date -d "$calc_start" '+%s')))"
-log info "Start: $script_start :: End: $script_end :: Total: $backup_size"
+calc_time "$(($(date -d "$analytics_end" '+%s') - $(date -d "$analytics_start" '+%s')))"
+log info "Start: $start_datetime :: End: $end_datetime :: Total: $backup_size"
 
 # Make sure no errors occured.
 if [[ $err > 0 ]]; then
