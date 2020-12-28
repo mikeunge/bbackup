@@ -1,6 +1,7 @@
-#!/bin/bash
-
-set -uo pipefail;
+BASHLOG_FILE=0;
+BASHLOG_JSON=0;
+BASHLOG_SYSLOG=0;
+LOGGING_UID=0;
 
 function _log_exception() {
   (
@@ -14,7 +15,7 @@ function _log_exception() {
 }
 
 function log() {
-  ((LOGGING_UID=LOGGING_UID+1))
+  ((LOGGING_UID=$LOGGING_UID+1))
   local date_format="${BASHLOG_DATE_FORMAT:-+%F %T}";
   local date="$(date "${date_format}")";
   local date_s="$(date "+%s")";
@@ -84,7 +85,7 @@ function log() {
     fi;
 
     if [ "${json}" -eq 1 ]; then
-      local json_line="$(printf '{"timestamp":"%s",id:"%s","level":"%s","message":"%s"}' "${date_s}" "${logging_uid}" "${level}" "${line}")";
+      local json_line="$(printf '{"timestamp":"%s",id:"%s","level":"%s","message":"%s"}' "${date_s}" "${LOGGING_UID}" "${level}" "${line}")";
       echo -e "${json_line}" >> "${json_path}" \
         || _log_exception "echo -e \"${json_line}\" >> \"${json_path}\"";
     fi;

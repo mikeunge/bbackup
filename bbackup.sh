@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # bbackup.sh
-# version: 1.1.0 @beta
+# version: 1.1.2 @beta
 #
 # Author:	Ungerböck Michele
 # Github:	github.com/mikeunge/bbackup
@@ -196,48 +196,21 @@ log_rotate() {
 #
 # ----------- Start of the script -----------
 #
-_pid=$$ 
-start_date=$(date +'%d.%m.%Y')
-start_datetime=$(date +'%d.%m.%Y %T')
-analytics_start=$(date +'%Y-%m-%d %T')
-
-if [[ $# == 0 ]]; then
-    log info "No arguments provided, fallback to default job => $DEFAULT_TASK.";
-    TASK="$DEFAULT_TASK";
-    TEST=0;
-else
-    argparser;
-    if ! [[ "$ARG_CONFIG" == 0 ]]; then
-        CONFIG_FILE="$ARG_CONFIG";
-    else
-        CONFIG_FILE="/etc/bbackup.conf";
-    fi
-    if ! [[ "$ARG_TASK" == 0 ]]; then
-        TASk="$ARG_TASK";
-    else
-        TASK="$DEFAULT_TASK";
-    fi
-    if ! [[ "$ARG_TEST" == 0 ]]; then
-        TEST=1;
-    else
-        TEST=0;
-    fi
-fi
-if [ -f "$CONFIG_FILE" ]; then
-    {
-        source $CONFIG_FILE;
-    } || {
-        printf "Could not source config file, make sure it's readable and the permissions are granted. Path: '%s'" "$CONFIG_FILE" >> /var/log/bbackup.error.log;
-        exit 1;
-    }
-else
-    printf "Configuration file doesn't exist! Path: '%s'\n" "$CONFIG_FILE" >> /var/log/bbackup.error.log;
+# Check if a bbackup instance is already running.
+if [ -f "/var/run/bbackup.pid" ]; then
+    printf "bbackup.sh could not create a lockfile (/var/run/bbackup.pid), make sure that only one instance of bbackup.sh is running." >> /var/log/bbackup.error.log;
     exit 1;
 fi
 
+_pid=$$;
+_execpath=$(dirname $(readlink -f $0));
+start_date=$(date +'%d.%m.%Y');
+start_datetime=$(date +'%d.%m.%Y %T');
+analytics_start=$(date +'%Y-%m-%d %T');
+
 # Import the libraries
 # On failure the script exits
-libs=("./libs/timer.sh" "./libs/notification.sh" "./libs/log.sh" "./libs/argparser.sh");
+libs=("$_execpath/libs/timer.sh" "$_execpath/libs/notification.sh" "$_execpath/libs/log.sh" "$_execpath/libs/argparser.sh");
 for lib in "${libs[@]}"; do
     if [ -f "$lib" ]; then
         {
@@ -247,7 +220,7 @@ for lib in "${libs[@]}"; do
             exit 1;
         }
     else
-        printf "Lib '%s' does not exist, script cannot run any longer." "$lib" >> /var/log/bbackup.error.log;
+        printf "Lib '%s' does not exist, script cannot run any longer.\n" "$lib" >> /var/log/bbackup.error.log;
         exit 1;
     fi
 done
@@ -264,33 +237,59 @@ else
     file_path=$LOG_FILE;
 fi
 
-# Check if a bbackup instance is already running.
-if [ -f "/var/run/bbackup.pid" ]; then
-    log error "bbackup.sh could not create a lockfile (/var/run/bbackup.pid), make sure that only one instance of bbackup.sh is running.";
-    panic 1;
+if [[ $# == 0 ]]; then
+    CONFIG_FILE="/etc/bbackup.conf";
+    TASK=0;
+    TEST=0;
+else
+    argparser;
+    if [[ "$ARG_CONFIG" == 0 ]]; then
+        CONFIG_FILE="/etc/bbackup.conf";
+    else
+        CONFIG_FILE="$ARG_CONFIG";
+    fi
+    if [[ "$ARG_TASK" == 0 ]]; then
+        TASK=0;
+    else
+        TASk="$ARG_TASK";
+    fi
+    if [[ "$ARG_TEST" == 0 ]]; then
+        TEST=0;
+    else
+        TEST=1;
+    fi
+fi
+if [ -f "$CONFIG_FILE" ]; then
+    {
+        source $CONFIG_FILE;
+    } || {
+        printf "Could not source config file, make sure it's readable and the permissions are granted. Path: '%s'\n" "$CONFIG_FILE" >> /var/log/bbackup.error.log;
+        exit 1;
+    }
+else
+    printf "Configuration file doesn't exist! Path: '%s'\n" "$CONFIG_FILE" >> /var/log/bbackup.error.log;
+    exit 1;
+fi
+
+if [[ $TASK == 0 ]]; then
+    TASK=$DEFAULT_TASK;
 fi
 
 if [[ $LOG_ROTATE == 1 ]]; then
-    if [[ $1 == "TEST" ]]; then
+    if [[ $TEST > 0 ]]; then
         return 0;
     fi
-    log debug "LOG_ROTATE is active.";
-    if [ -f "/var/run/bbackup.pid" ]; then
-        log warn "bbackup is locked (/var/run/bbackup.pid). Log rotate is active but was skipped.";
-    else
-        log_rotate;
-    fi
+    log_rotate;
 fi
 
 log info "*.bbackup.sh start.*";
-# Create lock (pid) file
 printf "%s\n" "$_pid" >> /var/run/bbackup.pid;
 log info "Created lockfile, $_pid >> /var/run/bbackup.pid"; 
 CLEANUP_DEST_ARR+=("/var/run/bbackup.pid");   # add the path for later cleanup
 log info "Configfile => $CONFIG_FILE";
 
 # Check if the second job is executed.
-if [[ $TASk == $SEC_TASK ]]; then
+if [[ $TASK == $SEC_TASK ]]; then
     if ! [ -z "$SEC_SHARE" ]; then
         log info "Second job got triggered, share has changed. [$SHARE => $SEC_SHARE]"
         SHARE="$SEC_SHARE"
@@ -347,7 +346,7 @@ if [[ $COMPRESS == 1 ]]; then
         error=1
 	fi
 	if ! [ -d $COMP_TMP ]; then
-		log info "TMP folder does not exist, creating '$COMP_TMP'" 
+		log info "Temp folder does not exist, creating '$COMP_TMP'" 
 		{
             if [[ $TEST == 0 ]]; then
 			    mkdir $COMP_TMP
@@ -472,11 +471,13 @@ else
 fi
 
 # Get the size of the backup.
-backup_size=$(du -hs $COMP_TMP | awk '{print $1}')
+if [[ $COMPRESS == 1 ]]; then
+    backup_size=$(du -hs $COMP_TMP | awk '{print $1}');
+fi
 
 # Mark the end of the script.
-end_datetime=$(date +'%d.%m.%Y %T')
-analytics_end=$(date +'%Y-%m-%d %T')
+end_datetime=$(date +'%d.%m.%Y %T');
+analytics_end=$(date +'%Y-%m-%d %T');
 
 # Calculate the difference between script start and script finished.
 calc_time "$(($(date -d "$analytics_end" '+%s') - $(date -d "$analytics_start" '+%s')))"

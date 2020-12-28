@@ -59,21 +59,21 @@ send_email() {
     case $MAIL_CLIENT in
         "sendmail")
             if [[ $rsnapshot_exists > 0 ]]; then
-                mail_str='sendmail -t $DEST_EMAIL -m "$SENDER [$status] - Task: $JOB - $start_date" -a $RSNAPSHOT_LOG_FILE'
+                mail_str='sendmail -t $DEST_EMAIL -m "$SENDER [$status] - Task: $TASK - $start_date" -a $RSNAPSHOT_LOG_FILE'
             else
-                mail_str='sendmail -t $DEST_EMAIL -m "$SENDER [$status] - Task: $JOB - $start_date"'
+                mail_str='sendmail -t $DEST_EMAIL -m "$SENDER [$status] - Task: $TASK - $start_date"'
             fi ;;
         "mail")
             if [[ $rsnapshot_exists > 0 ]]; then
-                mail_str='mail -A $RSNAPSHOT_LOG_FILE -s "$SENDER [$status] - Task: $JOB - $start_date" $DEST_EMAIL < $LOG_FILE'
+                mail_str='mail -A $RSNAPSHOT_LOG_FILE -s "$SENDER [$status] - Task: $TASK - $start_date" $DEST_EMAIL < $LOG_FILE'
             else
-                mail_str='mail -s "$SENDER [$status] - Task: $JOB - $start_date" $DEST_EMAIL < $LOG_FILE'
+                mail_str='mail -s "$SENDER [$status] - Task: $TASK - $start_date" $DEST_EMAIL < $LOG_FILE'
             fi ;;
         "mutt") 
             if [[ $rsnapshot_exists > 0 ]]; then
-                mail_str='mutt -s "$SENDER [$status] - Task: $JOB - $start_date" -a $RSNAPSHOT_LOG_FILE -- $DEST_EMAIL < $LOG_FILE'
+                mail_str='mutt -s "$SENDER [$status] - Task: $TASK - $start_date" -a $RSNAPSHOT_LOG_FILE -- $DEST_EMAIL < $LOG_FILE'
             else
-                mail_str='mutt -s "$SENDER [$status] - Task: $JOB - $start_date" -- $DEST_EMAIL < $LOG_FILE'
+                mail_str='mutt -s "$SENDER [$status] - Task: $TASK - $start_date" -- $DEST_EMAIL < $LOG_FILE'
             fi ;;
         "null" | "nil" | "none")
             log warn "E-Mail functionality is turned of. If you want to activate it, change the 'MAIL_CLIENT' in your config. ($CONFIG_FILE)" ;;
