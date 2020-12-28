@@ -251,7 +251,7 @@ else
     if [[ "$ARG_TASK" == 0 ]]; then
         TASK=0;
     else
-        TASk="$ARG_TASK";
+        TASK="$ARG_TASK";
     fi
     if [[ "$ARG_TEST" == 0 ]]; then
         TEST=0;
@@ -276,10 +276,9 @@ if [[ $TASK == 0 ]]; then
 fi
 
 if [[ $LOG_ROTATE == 1 ]]; then
-    if [[ $TEST > 0 ]]; then
-        return 0;
+    if [[ $TEST == 0 ]]; then
+        log_rotate;
     fi
-    log_rotate;
 fi
 
 log info "*.bbackup.sh start.*";
@@ -446,7 +445,7 @@ if [[ $TEST == 0 ]]; then
             cmd="$RSNAPSHOT $TASK" ;;
     esac
 else
-    cmd="$RSNAPSHOT -t $TASk"
+    cmd="$RSNAPSHOT -t $TASK"
     log debug "Test - Executing rsnapshot with it's test parameter."
     log debug "Test - rsnapshot job: $cmd" 
 fi
