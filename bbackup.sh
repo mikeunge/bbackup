@@ -253,12 +253,13 @@ else
     else
         TASK="$ARG_TASK";
     fi
-    if [[ "$ARG_TEST" == 0 ]]; then
+    if [[ "$ARG_TEST" == 0 ]]; then
         TEST=0;
     else
         TEST=1;
     fi
 fi
+
 if [ -f "$CONFIG_FILE" ]; then
     {
         source $CONFIG_FILE;

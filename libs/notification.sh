@@ -47,8 +47,12 @@ send_email() {
         local status="$1"
     fi
     if ! [ -f $LOG_FILE ]; then     # this prevents the script from failing silently, I just change the logging input from file to pre-defined text
-        printf "Logfile (%s) does not exist, please check for any errors and/or run the script while connected via session.\n" "$LOG_FILE" >> /var/log/bbackup.error.log
-        LOG_FILE="Log file ($LOG_FILE) does not exist, please check the error logs if any error occured."
+        if [ -f "/var/log/bbackup.error.log" ]; then
+            LOG_FILE="/var/log/bbackup.error.log";
+        else
+            printf "Logfile (%s) does not exist, please check for any errors and/or run the script while connected via session.\n" "$LOG_FILE" >> /var/log/bbackup.error.log
+            LOG_FILE="/var/log/bbackup.error.log";
+        fi
     fi
     local rsnapshot_exists
     if ! [ -f $RSNAPSHOT_LOG_FILE ]; then
