@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # bbackup.sh
-# version: 1.1.2 @beta
+# version: 1.1.2.1
 #
 # Author:	Ungerböck Michele
 # Github:	github.com/mikeunge/bbackup
@@ -13,61 +13,63 @@
 ############################################
 
 panic() {
-    # Unmount network share (if set)
-    if [[ $UMOUNT == 1 ]]; then
-        log info "Unmounting network share." 
-        unmount -f $MOUNT >/dev/null 2>&1
-
-        if [[ $? == 0 ]]; then
-            log info "$MOUNT successfully unmounted."
-        else
-            log warn "Something went wrong while unmounting drive $MOUNT" 
-        fi
-    fi
-
-    cleanup
     # Check if any argument is provided.
     if [ -z "$1" ]; then
-        local error=1
+        local error=1;
     else
-        local error=$1
+        local error=$1;
+    fi
+
+    cleanup;
+
+    # Unmount network share (if set)
+    if [[ $UMOUNT == 1 ]]; then
+        log info "Unmounting network share."; 
+        unmount -f $MOUNT >/dev/null 2>&1;
+
+        if [[ $? == 0 ]]; then
+            log info "$MOUNT successfully unmounted.";
+        else
+            log warn "Something went wrong while unmounting drive $MOUNT";
+            error=1;
+        fi
     fi
 
     case $ENDPOINT in
         0)
-            log info "Script has finished."
+            log info "No endpoint defined, script finished.";
             exit $error ;;
         1)  # send e-mail
             if [[ $error > 0 ]]; then
-                log error "An error occured, please check the mail content and/or the attachment for more informations."
-                send_email "Error"
+                log error "An error occured, please check the mail content and/or the attachment for more informations.";
+                send_email "Error";
             else
-                log info "Backup was successfully created!"
-                send_email "Info"
+                log info "Backup was successfully created!";
+                send_email "Success";
             fi ;;
         2)  # send http
             if [[ $error > 0 ]]; then
-                log error "An error occured, please check the logs for more informations."
-                send_http "Error"
+                log error "An error occured, please check the logs for more informations.";
+                send_http "Error";
             else
-                log info "Backup was successfully created!"
-                send_http "Info"
+                log info "Backup was successfully created!";
+                send_http "Success";
             fi ;;
         3)  # send http then status mail
             if [[ $error > 0 ]]; then
-                log error "An error occured, please check the logs for more informations."
-                send_http "Error"
-                send_email "Error"
+                log error "An error occured, please check the logs for more informations.";
+                send_http "Error";
+                send_email "Error";
             else
-                log info "Backup was successfully created!"
-                send_http "Info"
-                send_email "Error"
+                log info "Backup was successfully created!";
+                send_http "Success";
+                send_email "Success";
             fi ;;
         *)  # throw error
-            log error "Something went wrong, no endpoint was specified. Please check your configuration and fix the endpoint."
+            log error "Something went wrong, no endpoint was specified. Please check your configuration and fix the endpoint.";
             error=1 ;;
     esac
-    exit $error
+    exit $error;
 }
 
 # Clean all the created garbage.
@@ -225,18 +227,6 @@ for lib in "${libs[@]}"; do
     fi
 done
 
-# Define the BASHLOG paths configs
-# Modify the destination paths of the logging file for 
-# either plain or json.
-if [[ $BASHLOG_JSON == 1 ]]; then
-    LOG_FILE=$LOG_FILE".json";
-    BASHLOG_JSON_PATH=$LOG_FILE;
-    json_path=$LOG_FILE;
-else
-    BASHLOG_FILE_PATH=$LOG_FILE;
-    file_path=$LOG_FILE;
-fi
-
 if [[ $# == 0 ]]; then
     CONFIG_FILE="/etc/bbackup.conf";
     TASK=0;
@@ -259,7 +249,6 @@ else
         TEST=1;
     fi
 fi
-
 if [ -f "$CONFIG_FILE" ]; then
     {
         source $CONFIG_FILE;
@@ -274,6 +263,18 @@ fi
 
 if [[ $TASK == 0 ]]; then
     TASK=$DEFAULT_TASK;
+fi
+
+# Define the BASHLOG paths configs
+# Modify the destination paths of the logging file for 
+# either plain or json.
+if [[ $BASHLOG_JSON == 1 ]]; then
+    LOG_FILE=$LOG_FILE".json";
+    BASHLOG_JSON_PATH=$LOG_FILE;
+    json_path=$LOG_FILE;
+else
+    BASHLOG_FILE_PATH=$LOG_FILE;
+    file_path=$LOG_FILE;
 fi
 
 if [[ $LOG_ROTATE == 1 ]]; then
@@ -473,6 +474,8 @@ fi
 # Get the size of the backup.
 if [[ $COMPRESS == 1 ]]; then
     backup_size=$(du -hs $COMP_TMP | awk '{print $1}');
+else
+    backup_size="N/A";
 fi
 
 # Mark the end of the script.

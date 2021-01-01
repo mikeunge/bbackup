@@ -136,10 +136,3 @@ declare this_cmd="null";
 trap 'prev_cmd=$this_cmd; this_cmd=$BASH_COMMAND' DEBUG \
   && log debug 'DEBUG trap set' \
   || log error 'DEBUG trap failed to set';
-
-# This is an option if you want to log every single command executed,
-# but it will significantly impact script performance and unit tests will fail
-
-#trap 'prev_cmd=$this_cmd; this_cmd=$BASH_COMMAND; log debug $this_cmd' DEBUG \
-#  && log debug 'DEBUG trap set' \
-#  || log error 'DEBUG trap failed to set';
