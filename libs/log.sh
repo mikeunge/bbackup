@@ -15,7 +15,6 @@ function _log_exception() {
 }
 
 function log() {
-  ((LOGGING_UID=$LOGGING_UID+1))
   local date_format="${BASHLOG_DATE_FORMAT:-+%F %T}";
   local date="$(date "${date_format}")";
   local date_s="$(date "+%s")";
@@ -85,6 +84,7 @@ function log() {
     fi;
 
     if [ "${json}" -eq 1 ]; then
+      ((LOGGING_UID=$LOGGING_UID+1))
       local json_line="$(printf '{"timestamp":"%s",id:"%s","level":"%s","message":"%s"}' "${date_s}" "${LOGGING_UID}" "${level}" "${line}")";
       echo -e "${json_line}" >> "${json_path}" \
         || _log_exception "echo -e \"${json_line}\" >> \"${json_path}\"";
