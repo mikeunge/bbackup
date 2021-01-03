@@ -69,6 +69,8 @@ panic() {
             log error "Something went wrong, no endpoint was specified. Please check your configuration and fix the endpoint.";
             error=1 ;;
     esac
+    JSONLOG_CLOSE=1;
+    log info "bbackup.sh has finished.";
     exit $error;
 }
 
