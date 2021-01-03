@@ -21,7 +21,7 @@ send_http() {
         return 1
     fi
     log info "Sending data to '$SERVER:$PORT'"
-
+    JSONLOG_CLOSE=1;    
     # Create a connection and send the payload.
     # Check the status code and determin if everything was ok.
     local STATUS=$(curl --silent --output /dev/null --max-time $TIMEOUT --request POST --header "Content-Type: text/plain" --data "$payload" --write-out "%{http_code}" $SERVER:$PORT)
@@ -61,6 +61,7 @@ send_email() {
     else
         rsnapshot_exists=1
     fi
+    JSONLOG_CLOSE=1;    
     log debug "Sending email via $MAIL_CLIENT..." 
     local mail_str
     # Check if the mail_client is defined correctly.
@@ -84,10 +85,11 @@ send_email() {
                 mail_str='mutt -s "$SENDER [$status] - Task: $TASK - $start_date" -- $DEST_EMAIL < $LOG_FILE'
             fi ;;
         "null" | "nil" | "none")
-            log warn "E-Mail functionality is turned of. If you want to activate it, change the 'MAIL_CLIENT' in your config. ($CONFIG_FILE)" ;;
+            log warn "E-Mail function is turned of. If you want to activate it, change the 'MAIL_CLIENT' in your config. ($CONFIG_FILE)";
+            return 1 ;;
         *)
             log error "Could not send the e-mail; Mail client ($MAIL_CLIENT) is not (or wrong) defined. Please check the config. ($CONFIG_FILE)"
-        ;;
+            return 1 ;;
     esac 
     eval $mail_str
     wait

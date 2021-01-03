@@ -37,6 +37,7 @@ panic() {
 
     case $ENDPOINT in
         0)
+            JSONLOG_CLOSE=1;
             log info "No endpoint defined, script finished.";
             exit $error ;;
         1)  # send e-mail
@@ -66,11 +67,10 @@ panic() {
                 send_email "Success";
             fi ;;
         *)  # throw error
+            JSONLOG_CLOSE=1;
             log error "Something went wrong, no endpoint was specified. Please check your configuration and fix the endpoint.";
             error=1 ;;
     esac
-    JSONLOG_CLOSE=1;
-    log info "bbackup.sh has finished.";
     exit $error;
 }
 
