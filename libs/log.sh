@@ -2,9 +2,7 @@ BASHLOG_FILE=0;
 BASHLOG_JSON=0;
 BASHLOG_SYSLOG=0;
 LOGGING_UID=0;
-JSONLOG_STARTED=0;
-JSONLOG_CLOSE=0;
-
+JSONLOG_STARTED=0; JSONLOG_CLOSE=0; 
 function _log_exception() {
   (
     BASHLOG_FILE=0;
@@ -94,12 +92,13 @@ function log() {
       local json_line="$(printf '{"timestamp":"%s",id:"%s","level":"%s","message":"%s"},' "${date_s}" "${LOGGING_UID}" "${level}" "${line}")";
       echo -e "${json_line}" >> "${json_path}" \
         || _log_exception "echo -e \"${json_line}\" >> \"${json_path}\"";
-      if [ "$JSONLOG_CLOSE" -eq 1 ]; then
-        printf "]\n" >> "${json_path}";
-        JSONLOG_CLOSE=0;
-      fi
     fi;
-
+  fi;
+  if [ "${json}" -eq 1 ]; then
+    if [ "$JSONLOG_CLOSE" -eq 1 ]; then
+      printf "]\n" >> "${json_path}";
+      JSONLOG_CLOSE=0;
+    fi;
   fi;
 
   local -A colours;
